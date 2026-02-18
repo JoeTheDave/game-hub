@@ -1,0 +1,11 @@
+# This docker-compose.yml is primarily used for ensuring shared PostgreSQL container
+# The actual PostgreSQL container is managed globally across all game-hub projects
+
+services:
+  # Placeholder service - shared PostgreSQL container is managed via npm scripts
+  # to avoid conflicts between multiple projects
+  placeholder:
+    image: alpine:latest
+    command: echo "Using shared raise-the-bones-postgres container"
+    profiles:
+      - disabled

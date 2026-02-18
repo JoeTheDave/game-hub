@@ -1,0 +1,26 @@
+app = "game-hub"
+primary_region = "dfw"
+
+[build]
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  DATABASE_PROVIDER = "postgresql"
+  PRISMA_DISABLE_POSTINSTALL_GENERATION = "true"
+
+[deploy]
+  release_command = "npx prisma migrate deploy --schema=server/src/prisma/schema.prisma"
