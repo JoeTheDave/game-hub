@@ -13,11 +13,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Example model - you can modify or remove this
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String?
+  passwordHash String?  // null for Google SSO users
+  googleId     String?  @unique // set when user signs in with Google
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

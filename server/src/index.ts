@@ -2,7 +2,11 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import passport from 'passport'
 import prisma from './lib/prisma.js'
+import { sessionMiddleware } from './auth/session.js'
+import authRoutes from './routes/auth.js'
+import './auth/passport.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -10,16 +14,29 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3001
 
-app.use(cors())
+const isDev = process.env.NODE_ENV !== 'production'
+const clientOrigin = process.env.CLIENT_ORIGIN || (isDev ? 'http://localhost:3000' : undefined)
+
+app.use(
+  cors({
+    origin: clientOrigin || true,
+    credentials: true,
+  })
+)
 app.use(express.json())
+app.use(sessionMiddleware)
+app.use(passport.initialize())
+app.use(passport.session())
 
 // Serve static files from the React app build directory
 const clientBuildPath = path.join(__dirname, '../../dist/client')
 app.use(express.static(clientBuildPath))
 
+// Auth routes
+app.use('/api/auth', authRoutes)
+
 app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection
     await prisma.$queryRaw`SELECT 1`
     res.json({
       status: 'ok',
