@@ -1,4 +1,4 @@
-app = "game-hub"
+app = "sage-game-hub"
 primary_region = "dfw"
 
 [build]

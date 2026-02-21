@@ -49,9 +49,6 @@ Thumbs.db
 *.sqlite
 *.db
 
-# Fly.io deployment marker (optional - can track setup status)
-# .flyio-setup-complete
-
 # Temporary files
 *.tmp
 *.temp

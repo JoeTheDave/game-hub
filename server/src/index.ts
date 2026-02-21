@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import passport from 'passport'
@@ -14,6 +15,9 @@ const __dirname = path.dirname(__filename)
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Trust Fly.io proxy (required for secure cookies and correct protocol in production)
+app.set('trust proxy', 1)
+
 const isDev = process.env.NODE_ENV !== 'production'
 const clientOrigin = process.env.CLIENT_ORIGIN || (isDev ? 'http://localhost:3000' : undefined)
 
@@ -24,6 +28,7 @@ app.use(
   })
 )
 app.use(express.json())
+app.use(cookieParser())
 app.use(sessionMiddleware)
 app.use(passport.initialize())
 app.use(passport.session())

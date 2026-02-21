@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { createInterface } from 'readline';
-
-const SETUP_MARKER = '.flyio-setup-complete';
 
 // Color functions for console output
 const colors = {
@@ -110,15 +108,16 @@ async function getDatabaseUrl() {
     }
   }
   
-  // Check if DATABASE_URL is already set as a Fly secret
+  // Check if DATABASE_URL is already set as a Fly secret (use app from fly.toml)
   try {
-    const secrets = execCommand('fly secrets list', { silent: true });
-    if (secrets.includes('DATABASE_URL')) {
+    const appName = getAppNameFromFlyToml();
+    const secrets = execCommand(`fly secrets list -a ${appName}`, { silent: true });
+    if (secrets && secrets.includes('DATABASE_URL')) {
       log('✅', colors.green('DATABASE_URL already set as Fly secret'));
       return 'ALREADY_SET';
     }
   } catch (error) {
-    // Fly secrets command failed, continue
+    // Fly secrets command failed (e.g. app doesn't exist yet), continue
   }
   
   // Prompt user for PostgreSQL instance and create database
@@ -219,18 +218,27 @@ async function setDatabaseUrl(databaseUrl) {
   }
 }
 
-function markSetupComplete() {
-  writeFileSync(SETUP_MARKER, new Date().toISOString());
-  log('✅', colors.green('Deployment setup completed!'));
+function isFlyAlreadySetUp() {
+  try {
+    const appName = getAppNameFromFlyToml();
+    const appsList = execCommand('fly apps list', { silent: true, allowError: true });
+    if (!appsList || !appsList.includes(appName)) {
+      return false;
+    }
+    const secrets = execCommand(`fly secrets list -a ${appName}`, { silent: true, allowError: true });
+    return Boolean(secrets && secrets.includes('DATABASE_URL'));
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
-  // Check if setup already completed
-  if (existsSync(SETUP_MARKER)) {
-    // Setup already done, exit silently to continue with deployment
+  // Skip setup if Fly app already exists and has DATABASE_URL secret (source of truth)
+  // Set FORCE_FLY_SETUP=1 to run setup again (e.g. to change database or recreate app)
+  if (!process.env.FORCE_FLY_SETUP && isFlyAlreadySetUp()) {
     process.exit(0);
   }
-  
+
   // First-time deployment setup
   console.log(colors.bold(colors.blue('🚀 First-time deployment setup')));
   
@@ -239,8 +247,8 @@ async function main() {
     const databaseUrl = await getDatabaseUrl();
     await createFlyApp();
     await setDatabaseUrl(databaseUrl);
-    markSetupComplete();
     
+    log('✅', colors.green('Deployment setup completed!'));
     console.log('\n' + colors.green('🎉 Setup complete! Proceeding with deployment...'));
     
   } catch (error) {

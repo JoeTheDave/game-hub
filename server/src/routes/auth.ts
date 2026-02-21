@@ -88,16 +88,28 @@ router.get(
   passport.authenticate('google', { scope: ['profile', 'email'] })
 )
 
-// Google OAuth - callback
-router.get(
-  '/google/callback',
-  passport.authenticate('google', {
-    failureRedirect: '/login?error=google',
-    session: true,
-  }),
-  (_req: Request, res: Response) => {
-    res.redirect('/')
-  }
-)
+// Google OAuth - callback (custom handler so we can save session before redirect)
+router.get('/google/callback', (req: Request, res: Response, next) => {
+  passport.authenticate('google', (err: Error | null, user: Express.User | false) => {
+    if (err) {
+      return next(err)
+    }
+    if (!user) {
+      return res.redirect('/login?error=google')
+    }
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        return next(loginErr)
+      }
+      // Explicitly save the session before redirecting (required when using a session store e.g. on Fly.io)
+      req.session.save((saveErr) => {
+        if (saveErr) {
+          return next(saveErr)
+        }
+        res.redirect('/')
+      })
+    })
+  })(req, res, next)
+})
 
 export default router
