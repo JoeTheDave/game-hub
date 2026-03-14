@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt'
 import prisma from '../lib/prisma.js'
 
 export interface SessionUser {
-  id: number
+  id: string
   email: string
   name: string | null
 }
@@ -23,7 +23,9 @@ passport.deserializeUser(async (obj, done) => {
     })
     done(null, user)
   } catch (err) {
-    done(err, null)
+    // Invalid session data (e.g., stale ID format after schema migration) - clear session
+    console.error('[Passport] deserializeUser error, clearing session:', err)
+    done(null, null)
   }
 })
 

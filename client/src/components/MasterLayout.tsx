@@ -29,12 +29,22 @@ export function MasterLayout() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
       <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm sticky top-0 z-50">
         <div className="w-full px-4 h-16 flex items-center justify-between">
-          <Link
-            to="/"
-            className="font-black text-2xl tracking-tight bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
-          >
-            GameHub
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link
+              to="/"
+              className="font-black text-2xl tracking-tight bg-gradient-to-r from-amber-400 via-orange-400 to-rose-500 bg-clip-text text-transparent hover:opacity-90 transition-opacity"
+            >
+              GameHub
+            </Link>
+            {user && (
+              <Link
+                to="/create-game"
+                className="text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Create Game
+              </Link>
+            )}
+          </div>
 
           <div className="flex items-center gap-4">
             {loading ? (

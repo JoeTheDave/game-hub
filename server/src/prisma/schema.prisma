@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,11 +11,58 @@ datasource db {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
+  id           String   @id @default(uuid())
   email        String   @unique
   name         String?
   passwordHash String?  // null for Google SSO users
   googleId     String?  @unique // set when user signs in with Google
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  hostedGameInstances GameInstance[] @relation("HostUser")
+  gameInstancePlayers GameInstancePlayer[]
+}
+
+model Game {
+  id        String   @id @default(uuid())
+  slug      String   @unique // e.g. "tic-tac-toe"
+  name      String   // display name
+  options   Json?    // schema for creation options (number of players, variants, etc.)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  instances GameInstance[]
+}
+
+model GameInstance {
+  id         String   @id @default(uuid())
+  gameId     String
+  hostUserId String
+  joinCode   String   @unique // short code for QR / join URL
+  gameState  Json?    // game-specific state (includes status: lobby | in_progress | finished, board, turn, etc.)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  game     Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  hostUser User   @relation("HostUser", fields: [hostUserId], references: [id], onDelete: Cascade)
+  players  GameInstancePlayer[]
+
+  @@index([joinCode])
+}
+
+model GameInstancePlayer {
+  id             String   @id @default(uuid())
+  gameInstanceId String
+  userId         String?  // null for anonymous
+  screenName     String   // required; how they appear in game
+  color          String?  // player color: red, blue, green, yellow, orange, purple
+  joinToken      String?  // one-time token so first player can start from controller
+  playerOrder    Int      // 0-based seat index
+  joinedAt       DateTime @default(now())
+
+  gameInstance GameInstance @relation(fields: [gameInstanceId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([gameInstanceId, playerOrder])
+  @@index([gameInstanceId])
 }

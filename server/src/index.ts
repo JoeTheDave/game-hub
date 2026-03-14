@@ -1,3 +1,4 @@
+import http from 'http'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -6,7 +7,9 @@ import { fileURLToPath } from 'url'
 import passport from 'passport'
 import prisma from './lib/prisma.js'
 import { sessionMiddleware } from './auth/session.js'
+import { initSocket } from './lib/socket.js'
 import authRoutes from './routes/auth.js'
+import gameRoutes from './routes/games.js'
 import './auth/passport.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -37,8 +40,9 @@ app.use(passport.session())
 const clientBuildPath = path.join(__dirname, '../../dist/client')
 app.use(express.static(clientBuildPath))
 
-// Auth routes
+// API routes
 app.use('/api/auth', authRoutes)
+app.use('/api', gameRoutes)
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -85,6 +89,22 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(clientBuildPath, 'index.html'))
 })
 
-app.listen(PORT, () => {
+// Error handler: redirect to client error page for browser requests, JSON for API
+app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[Error]', err.message, err.stack)
+
+  // If it's an API request, return JSON
+  if (req.path.startsWith('/api/')) {
+    return res.status(500).json({ error: 'Internal server error' })
+  }
+
+  // For browser requests (like OAuth callbacks), redirect to error page
+  res.redirect('/error')
+})
+
+const httpServer = http.createServer(app)
+initSocket(httpServer, clientOrigin)
+
+httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`)
 })
