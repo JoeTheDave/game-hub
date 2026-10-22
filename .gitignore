@@ -52,3 +52,5 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+# Workflow specs (local only)
+.specs/
