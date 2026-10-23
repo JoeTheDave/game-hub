@@ -25,7 +25,7 @@ const MARK_TEXT_CLASSES: Record<string, string> = {
 
 /**
  * Controller view for Tic-Tac-Toe (player device). No header, never scrolls.
- * Lobby: name/color + roster; seat 0 is the game admin and gets Start Game once the lobby is full.
+ * Lobby: name/color + roster; seat 0 (first to join) silently gets Start Game once the lobby is full.
  * In game: portrait = info top, board below; landscape = info left, board right.
  */
 export function TicTacToeControllerPage() {
@@ -195,7 +195,6 @@ export function TicTacToeControllerPage() {
     const requiredPlayerCount = gs?.requiredPlayerCount ?? 2
     const isAdmin = playerOrder === 0
     const lobbyFull = instance.players.length >= requiredPlayerCount
-    const admin = instance.players.find((p) => p.playerOrder === 0)
     const usedColors = new Set(
       instance.players.filter((p) => p.playerOrder !== playerOrder).map((p) => p.color).filter(Boolean)
     )
@@ -208,11 +207,6 @@ export function TicTacToeControllerPage() {
           <div className="flex flex-col gap-4 [@media(orientation:landscape)]:flex-1">
             <div className="text-center [@media(orientation:landscape)]:text-left">
               <h1 className="text-2xl font-extrabold text-white tracking-tight">{instance.game.name}</h1>
-              {isAdmin && (
-                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold">
-                  ★ You&apos;re the game admin
-                </span>
-              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="player-name" className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -286,7 +280,6 @@ export function TicTacToeControllerPage() {
                         <span className="text-white truncate">
                           {p.screenName}
                           {p.playerOrder === playerOrder && <span className="text-slate-400"> (you)</span>}
-                          {p.playerOrder === 0 && <span className="text-amber-300"> ★</span>}
                         </span>
                       ) : (
                         <span className="text-slate-500 italic">Waiting to join…</span>
@@ -309,7 +302,7 @@ export function TicTacToeControllerPage() {
               <p className="text-center text-sm text-slate-400">
                 {!lobbyFull
                   ? `Waiting for ${missing} more player${missing === 1 ? '' : 's'}…`
-                  : `Waiting for ${admin?.screenName ?? 'the admin'} to start…`}
+                  : 'Waiting for the game to start…'}
               </p>
             )}
             {startError && <p className="text-center text-sm text-red-400">{startError}</p>}
