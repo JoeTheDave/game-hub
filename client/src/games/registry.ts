@@ -6,6 +6,7 @@ import type { ClientGameModule } from './types'
  */
 const GAMES: Record<string, () => Promise<{ default: ClientGameModule }>> = {
   'tic-tac-toe': () => import('./tic-tac-toe'),
+  splendor: () => import('./splendor'),
 }
 
 export function hasGame(slug: string): boolean {

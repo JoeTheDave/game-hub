@@ -9,7 +9,6 @@ import {
   TIERS,
   TOKENS,
   type Gem,
-  type GemCounts,
   type Tier,
   type Token,
 } from './data.js'

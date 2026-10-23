@@ -1,7 +1,7 @@
 # GameHub — Technical Reference
 
 ## What This Is
-A multiplayer party-game hub: a signed-in host creates a game and shows it on a shared screen, and players join from their phones via QR code or join code and play through a phone "controller", with live sync over Socket.IO. It deploys as a single Fly.io app (`sage-game-hub`, region `dfw`) where Express serves both the API and the built React client. The app is currently **suspended** (last release v7, 2026-03-14).
+A multiplayer party-game hub with games as self-contained modules (tic-tac-toe, Splendor): a signed-in host creates a game and shows it on a shared screen, and players join from their phones via QR code or join code and play through a phone "controller", with live sync over Socket.IO. It deploys as a single Fly.io app (`sage-game-hub`, region `dfw`) where Express serves both the API and the built React client. The app is currently **suspended** (last release v7, 2026-03-14).
 
 ## Workflow
 ```yaml
@@ -15,7 +15,6 @@ deployments:
 Bootstrapped from the older `raise-the-bones` template, before the current standards. These are drift from the standards, not deliberate choices. Treat them as candidates to modernize:
 - **Tailwind CSS v3** (`tailwind.config.js` + PostCSS), not v4.
 - **Node 18 Dockerfile**, single stage, which runs `npm ci` with dev deps in the image.
-- **No tests**: no Vitest/Supertest/RTL setup and no `test` scripts.
 - **No CI/CD**: no `.github/workflows/`. Deploys run by hand from a laptop.
 - **No staging environment.**
 - **Auth:** Passport with express-session (`connect-pg-simple` store, cookie `gamehub.sid`), offering email/password (bcrypt) and Google OAuth. Session-based, so it's in line with the standards.
@@ -24,7 +23,7 @@ Bootstrapped from the older `raise-the-bones` template, before the current stand
 ## Stack
 | Layer | In Use |
 |-------|--------|
-| Frontend | React 18, Vite 5, React Router 7, Tailwind 3, socket.io-client, qrcode.react, @emeraldpay/hashicon-react |
+| Frontend | React 18, Vite 5, React Router 7, Tailwind 3, socket.io-client, qrcode.react, Web Animations API (no animation lib), Web Audio SoundBoard |
 | Backend | Express 4 (ESM, TypeScript via tsx/tsc), Prisma 6, Socket.IO 4, Passport (local + google-oauth20) |
 | Database | PostgreSQL. Local: `game_hub_dev`. Prod: Fly Postgres via the `DATABASE_URL` secret (which cluster hasn't been verified) |
 | Auth | Session-based. Email/password plus Google SSO. Players don't need accounts |
@@ -33,68 +32,72 @@ Bootstrapped from the older `raise-the-bones` template, before the current stand
 ## Repo Structure
 ```
 game-hub/
-├── client/                    # Vite root (vite.config.ts lives here; build → dist/client)
-│   └── src/
-│       ├── App.tsx            # routes
-│       ├── components/MasterLayout.tsx
-│       ├── contexts/AuthContext.tsx
-│       ├── hooks/useSocket.ts # shared socket, subscribe-game / instance-updated
-│       ├── lib/api.ts, lib/stampSound.ts
-│       ├── pages/             # generic pages + *Route.tsx dispatchers by gameSlug
-│       │   └── tic-tac-toe/   # Lobby / Game (shared screen) / Controller (phone) pages
-│       └── types/game.ts
 ├── server/src/
-│   ├── index.ts               # express app, static serving, /api/health, SPA fallback, socket init
-│   ├── auth/                  # passport.ts (strategies, serialize), session.ts
-│   ├── lib/                   # prisma.ts, socket.ts, joinCode.ts
-│   ├── routes/                # auth.ts, games.ts
-│   └── prisma/                # schema.prisma + migrations
-├── scripts/                   # ensure-postgres.sh, ensure-database.sh, setup-deployment.js
-├── Dockerfile, fly.toml, docker-compose.yml (placeholder only), get-docker.sh
+│   ├── app.ts                 # createApp(): express app without listen (Supertest uses it)
+│   ├── index.ts               # http server + sockets + catalog sync on boot
+│   ├── games/                 # ── one folder per game; pure engines, no Express/Prisma/React ──
+│   │   ├── types.ts           # GameModule contract, seededRng, shuffle
+│   │   ├── registry.ts        # slug → module (the ONLY place a game is wired in server-side)
+│   │   ├── simulate.ts        # headless simulate()/replay()/randomAgent
+│   │   ├── simulate-cli.ts    # npm run simulate -- <slug> --games N --players P --seed S
+│   │   ├── tic-tac-toe/       # engine + tests
+│   │   └── splendor/          # data (90 cards, 10 nobles), engine, tests
+│   ├── lib/                   # gameInstances (lobbySafe, views, broadcast, catalog sync), socket, prisma, joinCode
+│   ├── routes/                # auth.ts, games.ts (generic; no game-specific code)
+│   └── prisma/                # schema + migrations
+├── client/src/
+│   ├── games/
+│   │   ├── types.ts           # ClientGameModule: { slug, TableView, PhoneView, prepareTable? }
+│   │   ├── registry.ts        # slug → lazy client module (the ONLY client wiring point)
+│   │   ├── tic-tac-toe/
+│   │   └── splendor/          # composed components, TableView (TV), PhoneView, logic, assets/
+│   ├── pages/                 # generic: HostLobbyPage, TablePage (TV), PlayPage (phone), JoinGamePage, …
+│   ├── components/PhoneLobby.tsx
+│   ├── hooks/                 # useTableFeed, useSeatFeed, useSocket (useLiveSubscription), useSoundBoard, useGameModule
+│   └── lib/                   # soundBoard, seat storage, phoneScreen shell, playerColors, api
+├── tools/splendor-art/        # ComfyUI workflows, prompts, cutout + sound synthesis scripts
+└── vitest.config.ts           # server/src/**/*.test.ts + client/src/**/*.test.ts
 ```
 
 ## Data Models
-- **User**: `id` uuid, `email` unique, `name?`, `passwordHash?` (null for Google users), `googleId?` unique, timestamps. Has `hostedGameInstances` and `gameInstancePlayers`.
-- **Game**: a catalog entry. `id` uuid, `slug` unique (e.g. `tic-tac-toe`), `name`, `options` Json? (creation-options schema, unused so far), timestamps. Tic-tac-toe is seeded by migration `20250812000000_seed_tic_tac_toe`.
-- **GameInstance**: `id` uuid, `gameId` → Game (cascade), `hostUserId` → User (cascade), `joinCode` unique (8 chars, alphabet without I/O), `gameState` Json? (game-specific, always has `status`), timestamps. Index on `joinCode`.
-- **GameInstancePlayer**: `id` uuid, `gameInstanceId` → GameInstance (cascade), `userId?` → User (set null; null for anonymous), `screenName`, `color?` (red/blue/green/yellow/orange/purple), `joinToken?`, `playerOrder` Int (0-based seat), `joinedAt`. Unique on `(gameInstanceId, playerOrder)`.
-- Also: the `session` table, which `connect-pg-simple` creates at runtime (`createTableIfMissing`). It isn't in Prisma.
+- **User**: `id` uuid, `email` unique, `name?`, `passwordHash?` (null for Google users), `googleId?` unique, timestamps.
+- **Game**: catalog row. It's **upserted on boot from the server registry** (`syncGameCatalog`), so a new game needs no migration. Fields: `slug` unique, `name`, and `options` Json = `{ minPlayers, maxPlayers }`.
+- **GameInstance**: `id` uuid, `gameId`, `hostUserId`, `joinCode` (8 chars, no I/O).
+  - `gameState` Json = `{ phase: 'lobby'|'playing'|'finished', state?: <engine state> }`. The platform owns `phase`, and the engine owns `state`.
+  - `version` Int is incremented on every write (optimistic concurrency).
+- **GameInstancePlayer**: `playerOrder` (seat), `screenName`, `color?`, `joinToken` (the seat's secret, returned only to the joiner), `userId?`. Unique on `(gameInstanceId, playerOrder)`.
+- Also: the `session` table, created at runtime by `connect-pg-simple`.
 
 ## API Endpoints
-**Auth** (`/api/auth`)
-- `GET /me`: the current user, or 401
-- `POST /register`: email, password, passwordConfirmation (min 8). Creates the user and logs in
-- `POST /login`: email/password
-- `POST /logout`
-- `GET /google`, `GET /google/callback`: Google OAuth. The callback explicitly calls `session.save()` before redirecting to `/`, and redirects to `/login?error=google` on failure
+**Auth** (`/api/auth`): `GET /me`, `POST /register`, `POST /login`, `POST /logout`, `GET /google`, and `GET /google/callback`.
 
-**Games** (`/api`)
-- `GET /games`: the catalog (public)
-- `POST /games/instances`: **auth required**. `{ gameId }` → creates an instance in `status: lobby` (tic-tac-toe sets `requiredPlayerCount: 2`)
-- `GET /games/instances/by-code/:joinCode`: public; the code is upper-cased
-- `GET /games/instances/:id`: public
-- `POST /games/instances/:id/join`: optional auth. `{ screenName? }` → assigns the next `playerOrder`, a default color and a `joinToken`. Rejects if not in lobby or if the game is full
-- `PATCH /games/instances/:id/players`: no auth. `{ playerOrder, screenName?, color? }`, lobby only, colors are unique per instance
-- `POST /games/instances/:id/start`: the host (session) or the first player (seat 0 with a matching `joinToken`). Requires a full lobby
-- `POST /games/instances/:id/move`: `{ playerOrder, row, col }`. Tic-tac-toe only; status moves `in_progress` → `playing` → `won` | `draw`
+**Games** (`/api`). These routes are generic, and responses are **lobby-safe**: no joinTokens, no host email, and engine state only via `tableView`.
+- `GET /games`: the catalog, with min/max players.
+- `POST /games/instances` (auth): creates an instance in phase `lobby`.
+- `GET /games/instances/by-code/:joinCode` and `GET /games/instances/:id`: return the lobby-safe instance, plus `tableView` when playing.
+- `GET /games/instances/:id/me?playerOrder&joinToken`: returns that seat's `playerView`.
+- `POST /games/instances/:id/join` `{ screenName? }`: returns `{ instance, player: { playerOrder, screenName, color, joinToken } }`. This is the only response that carries a token.
+- `PATCH /games/instances/:id/players` `{ playerOrder, joinToken, screenName?, color? }`: lobby only.
+- `POST /games/instances/:id/start`: host session or seat 0's `joinToken`, once `players >= minPlayers`. Calls `module.setup`.
+- `POST /games/instances/:id/action` `{ playerOrder, joinToken, action, version? }`: calls `module.applyAction`, then a versioned write. Returns `{ playerView, version }`, or a 409 with a fresh view on conflict.
+- `GET /api/health`: DB ping. Unknown `/api/*` paths return a JSON 404.
 
-**Other**
-- `GET /api/health`: DB ping
-- `GET /api/users`, `POST /api/users`: **leftover template examples, unauthenticated**. `GET` returns the full User rows *including `passwordHash`*. Remove these before reviving the app.
-
-Every state-changing game route re-reads the instance (with game, hostUser and the ordered players) and broadcasts it to the Socket.IO room `game:<id>` as `instance-updated`.
+**Sockets** (per-viewer rooms):
+- `subscribe-table {id}` joins `game:<id>:table`.
+- `subscribe-seat {id, playerOrder, joinToken}` is token-checked and joins `game:<id>:seat:<n>`.
+- Every write emits `table-updated {instance, events, version}` to the table and all seats, and `seat-updated {playerOrder, playerView, version}` to each seat.
 
 ## Frontend Routes
-| Path | Component | Auth | Layout |
-|------|-----------|------|--------|
+| Path | Component | Auth | Notes |
+|------|-----------|------|-------|
 | `/` | LandingPage (blank placeholder) | – | MasterLayout |
 | `/login`, `/register` | LoginPage, RegisterPage | – | MasterLayout |
-| `/create-game` | CreateGamePage | required | MasterLayout |
-| `/lobby/:gameSlug/:id` | GameLobbyRoute → e.g. TicTacToeLobbyPage (shows the QR code and join URL) | required | MasterLayout |
-| `/game/:gameSlug/:id` | GameViewRoute → e.g. TicTacToeGamePage (shared screen) | required | MasterLayout |
-| `/join/:joinCode` | JoinGamePage (phone; pick a name/color) | – | none |
-| `/play/:gameSlug/:id` | GameControllerRoute → e.g. TicTacToeControllerPage (phone controller) | – | none |
-| `/error`, `*` | ErrorPage | – | none |
+| `/create-game` | CreateGamePage | required | MasterLayout; shows player counts |
+| `/lobby/:slug/:id` | HostLobbyPage (QR, join URL, roster, Start) | required | MasterLayout |
+| `/game/:slug/:id` | TablePage, which renders the game's `TableView` (the TV) | – | full screen; sound unlock overlay + mute |
+| `/join/:joinCode` | JoinGamePage (auto-join, stores seat) | – | phone shell |
+| `/play/:slug/:id` | PlayPage, which renders the shared PhoneLobby, then the game's `PhoneView` | – | phone shell |
+| `/error`, `*` | ErrorPage | – | |
 
 ## Environment Variables
 | Variable | Where Set | Notes |
@@ -109,14 +112,24 @@ Every state-changing game route re-reads the instance (with game, hostUser and t
 | `NODE_ENV`, `DATABASE_PROVIDER`, `PRISMA_DISABLE_POSTINSTALL_GENERATION` | fly.toml `[env]` | |
 
 ## Non-Obvious Conventions
-- **Adding a game** has two halves. Server: branch on `game.slug` in `POST /games/instances` (initial state), `/start` (board setup) and `/move` (rules). Client: add `pages/<slug>/` Lobby/Game/Controller pages and register them in the three `*Route.tsx` dispatchers. Seed the `Game` row with a migration.
-- **Player identity is client-held.** The phone stores its `playerOrder` (and `joinToken`) after joining and sends it with moves. `/move` trusts `playerOrder` without checking the token, so any client can move for any seat. That's acceptable for a party game, but know it's there.
-- **Status values:** `lobby`, then `in_progress` (right after start), then `playing` (after the first move), then `won`/`draw`. `/move` accepts both `in_progress` and `playing`.
+- **Adding a game** (spec 1792780973323):
+  - Server: create `server/src/games/<slug>/` implementing `GameModule` (pure; JSON-only state; rng only via the injected `Rng`; no clock).
+  - Client: create `client/src/games/<slug>/` exporting `{ slug, TableView, PhoneView, prepareTable? }`.
+  - Add one line to each registry. Nothing else changes, and no migration is needed.
+  - Run `npm test`. Every game's suite must still pass, which is the guarantee that a new game doesn't break old ones.
+- **Hidden info is enforced server-side.** The table and other seats only ever get `tableView`, and each phone gets its own `playerView`. Engines decide what's hidden (e.g. Splendor's reserved cards are `{tier}` only to non-owners).
+- **Events drive the TV's animation and sound.** `applyAction` returns `events` (which must contain no hidden info). `useTableFeed` queues them, and the TableView calls `onEventsDone`; the platform skips ahead after 4 s. A resync or first load has no events, so it renders without animating.
+- **Headless simulation:** `simulate(module, {players, seed, agents})` plays a whole game with no server or UI, and replay is deterministic from seed + log. `npm run simulate -- splendor --games 2000 --players 2` runs at about 2,100 games/sec. This is meant for generating neural-network training data later.
+- **Client imports pure engine/data via `@games/*`** (Vite alias → `server/src/games`). Those files get type-checked under the client's strict settings, so they need type-only imports, no enums and no Node built-ins.
+- **Splendor art:**
+  - Generated locally (ComfyUI: Flux fp8 for gems, SDXL for scenes and portraits), and composed in code.
+  - Exactly one image per gem, reused everywhere.
+  - The scans in the vault are reference only and never ship.
+  - Regenerate with `tools/splendor-art/` (see `assets/README.md`). ComfyUI on this GPU needs `--disable-smart-memory --fp32-vae`.
 - **Sockets in dev** connect straight to `http://localhost:3001` (Vite only proxies `/api`). In prod they're same-origin.
 - `trust proxy` is set to 1 for Fly, which secure cookies require.
-- **Local Postgres mismatch:** `scripts/ensure-postgres.sh` creates/starts a container named `raise-the-bones-postgres` on :5432 (password `localdev123`), but this machine now runs `sage-shared-dev-postgres` on :5432. `npm run dev` will try to start the old container and collide on the port. Either repoint the script at `sage-shared-dev-postgres` (with matching credentials in `.env`) or skip `db:ensure`.
-- Migration `20250809000000_add_example_users` seeds `alice@example.com`/`bob@example.com` into **every** environment, prod included.
-- `docker-compose.yml` is a disabled placeholder, and `get-docker.sh` is the vendored Docker installer. Neither is used by the app.
+- **Local Postgres:** `scripts/ensure-postgres.sh` uses the machine's shared `sage-shared-dev-postgres` container (postgres/localdev123). It provides `game_hub_dev` and `game_hub_test` (route tests use the test DB, and `fileParallelism` is off).
+- Migration `20250809000000_add_example_users` seeds `alice@example.com`/`bob@example.com` into every environment.
 
 ## Tagged Versions
 None yet.
