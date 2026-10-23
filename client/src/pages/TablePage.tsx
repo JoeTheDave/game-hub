@@ -51,7 +51,7 @@ export function TablePage() {
         />
       </div>
 
-      <div className="absolute top-3 right-3 z-40 flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
         <button
           type="button"
           onClick={toggleMute}

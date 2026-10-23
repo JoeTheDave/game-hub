@@ -14,3 +14,5 @@ Generator: `tools/splendor-art/make_sounds.py`. To regenerate: `python make_soun
 | noble-chime.mp3 | noble visits a player |
 | turn-tick.mp3 | turn passes to the next player |
 | fanfare.mp3 | game over |
+
+Levels: every sound is normalized to about -12 dBFS, with rounded 5–15 ms attacks and a final low-pass, so nothing clicks or hisses. The table also plays them at reduced gain.

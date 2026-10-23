@@ -237,7 +237,7 @@ export function NobleTile({ id, size, style }: { id: string; size: number; style
   )
 }
 
-/** A single gem token: parchment disc, coloured rim, the gem. */
+/** A single gem token: a coloured rim around a soft, subtle disc, with a large gem filling it. */
 export function Token({ gem, size, style }: { gem: Token; size: number; style?: CSSProperties }) {
   return (
     <div
@@ -247,67 +247,104 @@ export function Token({ gem, size, style }: { gem: Token; size: number; style?: 
         height: size,
         fontSize: size / 10,
         borderRadius: '50%',
-        border: `0.9em solid ${GEM_COLOR[gem]}`,
-        boxShadow: `0 0.15em 0.3em rgba(0,0,0,.55), inset 0 0 0 0.15em rgba(0,0,0,.18), 0 0 0 0.08em rgba(0,0,0,.35)`,
-        backgroundImage: `url(${PARCHMENT_IMG})`,
-        backgroundSize: 'cover',
+        border: `0.65em solid ${GEM_COLOR[gem]}`,
+        boxShadow: `0 0.12em 0.28em rgba(0,0,0,.5), inset 0 0 0 0.1em rgba(0,0,0,.15), 0 0 0 0.06em rgba(0,0,0,.3)`,
+        background: 'radial-gradient(circle at 40% 35%, #f6efe2 0%, #e9dfcc 70%, #d9ccb4 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
         ...style,
       }}
     >
-      <GemImg gem={gem} size="5.4em" />
+      {/* parchment texture, kept very faint so the gem dominates */}
+      <img
+        src={PARCHMENT_IMG}
+        alt=""
+        draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.18 }}
+      />
+      <GemImg gem={gem} size="7em" style={{ position: 'relative' }} />
     </div>
   )
 }
 
-/** A pile of tokens: a short stack (height tracks count) with the count on top. */
-export function TokenPile({ gem, count, size, showZero = true }: { gem: Token; count: number; size: number; showZero?: boolean }) {
+/**
+ * A physical pile of tokens: chips stacked with a slight natural wobble, height tracking the
+ * count. The box is one chip (the base), so animations land on the pile itself; the stack rises
+ * above it. An empty pile shows nothing unless `ghost` (a faint ring marks the bank spot).
+ */
+export function TokenPile({
+  gem,
+  count,
+  size,
+  ghost = true,
+  label = true,
+}: {
+  gem: Token
+  count: number
+  size: number
+  ghost?: boolean
+  label?: boolean
+}) {
   const layers = Math.min(count, 7)
-  const step = size * 0.06
+  const step = size * 0.07
   return (
-    <div style={{ position: 'relative', width: size, height: size + step * 6, opacity: count === 0 && showZero ? 0.35 : 1 }}>
-      {Array.from({ length: Math.max(layers, 1) }, (_, i) => (
-        <div
-          key={i}
-          style={{ position: 'absolute', left: 0, bottom: i * step, opacity: count === 0 ? 0.5 : 1 }}
-        >
-          {count === 0 ? (
-            <div style={{ width: size, height: size, borderRadius: '50%', border: `2px dashed ${GEM_COLOR[gem]}` }} />
-          ) : (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      {count === 0 && ghost && (
+        <div style={{ position: 'absolute', inset: size * 0.06, borderRadius: '50%', border: `2px solid ${GEM_COLOR[gem]}`, opacity: 0.25 }} />
+      )}
+      {Array.from({ length: layers }, (_, i) => {
+        const j = jitter(`${gem}-${i}`, 1, size * 0.03)
+        return (
+          <div key={i} style={{ position: 'absolute', left: j.dx, top: -i * step + j.dy }}>
             <Token gem={gem} size={size} />
-          )}
-        </div>
-      ))}
-      <CountBadge n={count} style={{ position: 'absolute', right: -size * 0.12, top: -size * 0.05, fontSize: size * 0.26 }} />
+          </div>
+        )
+      })}
+      {label && count > 0 && <CountBadge n={count} style={{ position: 'absolute', right: -size * 0.22, top: -layers * step - size * 0.02, fontSize: size * 0.26 }} />}
     </div>
   )
 }
 
+/** A small, soft count marker (no hard border) so numbers read without looking like UI chrome. */
 export function CountBadge({ n, style }: { n: number; style?: CSSProperties }) {
   return (
     <span
+      className="spl-serif"
       style={{
-        minWidth: '1.6em',
-        height: '1.6em',
-        padding: '0 0.35em',
-        borderRadius: '0.8em',
-        background: 'rgba(15,10,5,.85)',
-        border: '0.08em solid rgba(253,230,138,.7)',
-        color: '#fde68a',
-        fontWeight: 800,
+        minWidth: '1.5em',
+        height: '1.5em',
+        padding: '0 0.3em',
+        borderRadius: '0.75em',
+        background: 'rgba(20,12,6,.55)',
+        color: '#fbecc4',
+        fontWeight: 700,
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
         lineHeight: 1,
-        boxShadow: '0 0.08em 0.2em rgba(0,0,0,.5)',
+        boxShadow: '0 0.05em 0.15em rgba(0,0,0,.35)',
         ...style,
       }}
     >
       {n}
     </span>
   )
+}
+
+/**
+ * Deterministic "lying on a table" imperfection: a small rotation (±maxDeg) and offset (±maxPx)
+ * derived from a stable key, so pieces never jitter between renders.
+ */
+export function jitter(key: string, maxDeg: number, maxPx: number) {
+  let h = 2166136261
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  const r = (shift: number) => (((h >>> shift) & 0xff) / 255) * 2 - 1
+  return { rot: r(0) * maxDeg, dx: r(8) * maxPx, dy: r(16) * maxPx }
 }
 
 /** Tableau column overlap: how much of each covered card shows (its top band). */

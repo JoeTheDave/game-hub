@@ -1,20 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { TableViewProps } from '../types'
 import type { PublicPlayer, SplendorTableView } from '@games/splendor/engine'
-import { GEMS, TOKENS, type Gem, type Tier, type Token as TokenKind } from '@games/splendor/data'
+import { GEMS, TOKENS, type Tier, type Token as TokenKind } from '@games/splendor/data'
 import { CARD_BY_ID } from '@games/splendor/data'
-import {
-  CARD_RATIO,
-  Card,
-  CardBack,
-  CountBadge,
-  GemImg,
-  NobleTile,
-  TABLEAU_PEEK,
-  Token,
-  TokenPile,
-  seatHex,
-} from './components'
+import { CARD_RATIO, Card, CardBack, NobleTile, TABLEAU_PEEK, Token, TokenPile, jitter, seatHex } from './components'
 import { FlyerView, type Flyer, type Rect } from './flyers'
 import { TABLE_IMG } from './assets'
 import './splendor.css'
@@ -22,30 +11,48 @@ import './splendor.css'
 // ——— Design canvas (scaled to fit any TV) ———
 const W = 1920
 const H = 1080
-const BOARD_CARD = 118
-const NOBLE = 100
-const PILE = 70
-const MINI = 78
-const RES = 52
-const PTOKEN = 44
 
-type Area = { x: number; y: number; w: number; h: number }
-function areasFor(n: number): Area[] {
-  const L = 20
-  const R = W - 20 - 530
-  if (n <= 2) return [
-    { x: L, y: 20, w: 530, h: H - 40 },
-    { x: R, y: 20, w: 530, h: H - 40 },
-  ]
-  const top = { y: 20, h: 510 }
-  const bot = { y: 550, h: 510 }
-  const all = [
-    { x: L, ...top },
-    { x: R, ...top },
-    { x: R, ...bot },
-    { x: L, ...bot },
-  ]
-  return all.slice(0, n).map((a) => ({ ...a, w: 530 }))
+// Central market: big, straight cards so a couch can read them (and flights land exactly).
+const CARD = 184
+const CARD_H = CARD * CARD_RATIO
+const GAP = 16
+const NOBLE = 128
+const BANK_CHIP = 76
+const BANK_PITCH = 134
+const MARKET_W = CARD * 5 + GAP * 4
+export const BLOCK_W = MARKET_W + 28 + 100 // market + gap + bank column
+export const MARKET_X = (W - BLOCK_W) / 2
+const NOBLES_Y = 22
+const TIERS_Y = NOBLES_Y + NOBLE + 22
+const BANK_X = MARKET_X + MARKET_W + 40
+const SIDE_W = MARKET_X - 16 // open table on each side of the market
+
+/** How big each player's pieces are, by how many players share the table. */
+interface Profile {
+  mini: number
+  tableauCap: number
+  tok: number
+  res: number
+  noble: number
+  name: number
+  disc: number
+}
+const PROFILE_TALL: Profile = { mini: 70, tableauCap: 430, tok: 52, res: 72, noble: 78, name: 30, disc: 62 }
+const PROFILE_CORNER: Profile = { mini: 62, tableauCap: 205, tok: 44, res: 56, noble: 60, name: 25, disc: 52 }
+
+type Zone = { x: number; y: number; w: number; h: number; profile: Profile }
+/**
+ * Open-table zones in front of each seat: 2 players face each other across the market;
+ * 3 players take two corners and one long side; 4 players take the four corners.
+ */
+export function zonesFor(n: number): Zone[] {
+  const L = 14
+  const R = W - SIDE_W - 14
+  const tall = (x: number): Zone => ({ x, y: 20, w: SIDE_W, h: H - 40, profile: PROFILE_TALL })
+  const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: SIDE_W, h: H / 2 - 20, profile: PROFILE_CORNER })
+  if (n <= 2) return [tall(L), tall(R)]
+  if (n === 3) return [corner(L, false), corner(L, true), tall(R)]
+  return [corner(L, false), corner(L, true), corner(R, true), corner(R, false)]
 }
 
 function useStageScale() {
@@ -78,6 +85,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
     if (timerRef.current != null) window.clearTimeout(timerRef.current)
   }, [])
 
+  // Anchors are unrotated boxes; a piece's resting tilt rides along in data-rot.
   const measure = useCallback(() => {
     const stage = stageRef.current
     const map = new Map<string, Rect>()
@@ -86,7 +94,13 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
     const k = s.width / W
     stage.querySelectorAll<HTMLElement>('[data-anchor]').forEach((el) => {
       const r = el.getBoundingClientRect()
-      map.set(el.dataset.anchor!, { x: (r.left - s.left) / k, y: (r.top - s.top) / k, w: r.width / k, h: r.height / k })
+      map.set(el.dataset.anchor!, {
+        x: (r.left - s.left) / k,
+        y: (r.top - s.top) / k,
+        w: r.width / k,
+        h: r.height / k,
+        r: Number(el.dataset.rot ?? 0),
+      })
     })
     return map
   }, [])
@@ -109,7 +123,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         onEventsDone()
       } else {
         const plan = planAnimation(events, prev, view, rectsRef.current, now, reduced)
-        for (const s of plan.sounds) sound.play(s.name, { delayMs: s.at, volume: s.volume })
+        for (const s of plan.sounds) sound.play(s.name, { delayMs: s.at, volume: (s.volume ?? 1) * SOUND_GAIN })
         setFlyers(plan.flyers)
         setHidden(plan.hidden)
         if (timerRef.current != null) window.clearTimeout(timerRef.current)
@@ -120,16 +134,14 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
           setHidden([])
           setGlowTurn(turn)
           onEventsDone()
-        }, plan.total + 40)
+        }, plan.total + 60)
       }
     }
     rectsRef.current = now
   })
 
   const hideCss = hidden.map((a) => `[data-anchor="${a}"]{visibility:hidden}`).join('')
-  const areas = areasFor(view.players.length)
-  const boardX = 573
-  const pilesX = boardX + BOARD_CARD * 5 + 16 * 4 + 34
+  const zones = zonesFor(view.players.length)
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: '#1a120b' }}>
@@ -149,57 +161,59 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         }}
       >
         <style>{hideCss}</style>
+        {/* warm overhead light, falling off toward the edges of the table */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'radial-gradient(ellipse at 50% 45%, rgba(255,220,160,.10) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,.6) 100%)',
+            background: 'radial-gradient(ellipse 75% 70% at 50% 48%, rgba(255,214,150,.13) 0%, rgba(0,0,0,0) 55%, rgba(0,0,0,.5) 100%)',
             pointerEvents: 'none',
           }}
         />
 
-        {/* Last action / status banner */}
-        <Banner view={view} seq={seq} />
+        {/* Each player's light pool sits under their pieces */}
+        {view.players.map((p, i) => (
+          <TurnGlow key={`glow-${p.seat}`} zone={zones[i]} hex={seatHex(p.color)} on={!view.finished && glowTurn === p.seat} />
+        ))}
 
         {/* Nobles */}
-        <div style={{ position: 'absolute', left: boardX, top: 82, width: BOARD_CARD * 5 + 64, display: 'flex', justifyContent: 'center', gap: 16 }}>
-          {view.nobles.map((id) => (
-            <div key={id} data-anchor={`noble-${id}`}>
-              <NobleTile id={id} size={NOBLE} />
-            </div>
-          ))}
+        <div style={{ position: 'absolute', left: MARKET_X, top: NOBLES_Y, width: MARKET_W, display: 'flex', justifyContent: 'center', gap: 22 }}>
+          {view.nobles.map((id) => {
+            const j = jitter(`noble-${id}`, 2, 3)
+            return (
+              <div key={id} data-anchor={`noble-${id}`} data-rot={j.rot} style={{ width: NOBLE, height: NOBLE }}>
+                <NobleTile id={id} size={NOBLE} style={{ transform: `translate(${j.dx}px, ${j.dy}px) rotate(${j.rot}deg)` }} />
+              </div>
+            )
+          })}
         </div>
 
-        {/* Tiers 3 / 2 / 1 */}
+        {view.endTriggered && !view.finished && <FinalRoundSeal />}
+
+        {/* Tiers 3 / 2 / 1: deck + four face-up cards */}
         {([3, 2, 1] as Tier[]).map((tier, row) => (
-          <div key={tier} style={{ position: 'absolute', left: boardX, top: 205 + row * (BOARD_CARD * CARD_RATIO + 16), display: 'flex', gap: 16 }}>
-            <div data-anchor={`deck-${tier}`} style={{ position: 'relative' }}>
-              {view.decks[tier] > 0 ? (
-                <DeckStack tier={tier} count={view.decks[tier]} size={BOARD_CARD} />
-              ) : (
-                <EmptySlot size={BOARD_CARD} />
-              )}
+          <div key={tier} style={{ position: 'absolute', left: MARKET_X, top: TIERS_Y + row * (CARD_H + GAP), display: 'flex', gap: GAP }}>
+            <div data-anchor={`deck-${tier}`} style={{ position: 'relative', width: CARD, height: CARD_H }}>
+              {view.decks[tier] > 0 ? <DeckStack tier={tier} count={view.decks[tier]} size={CARD} /> : <EmptySlot size={CARD} />}
             </div>
             {view.board[tier].map((id, slot) => (
-              <div key={slot} data-anchor={`slot-${tier}-${slot}`}>
-                {id ? <Card id={id} size={BOARD_CARD} /> : <EmptySlot size={BOARD_CARD} />}
+              <div key={slot} data-anchor={`slot-${tier}-${slot}`} style={{ width: CARD, height: CARD_H }}>
+                {id ? <Card id={id} size={CARD} /> : <EmptySlot size={CARD} />}
               </div>
             ))}
           </div>
         ))}
 
-        {/* Bank */}
-        <div style={{ position: 'absolute', left: pilesX, top: 205, display: 'flex', flexDirection: 'column', gap: 22 }}>
-          {TOKENS.map((t) => (
-            <div key={t} data-anchor={`bank-${t}`}>
-              <TokenPile gem={t} count={view.bank[t]} size={PILE} />
-            </div>
-          ))}
-        </div>
+        {/* Bank: real chip stacks beside the market */}
+        {TOKENS.map((t, i) => (
+          <div key={t} data-anchor={`bank-${t}`} style={{ position: 'absolute', left: BANK_X, top: TIERS_Y + 40 + i * BANK_PITCH, width: BANK_CHIP, height: BANK_CHIP }}>
+            <TokenPile gem={t} count={view.bank[t]} size={BANK_CHIP} />
+          </div>
+        ))}
 
-        {/* Players */}
+        {/* Players: their pieces lie loose on the table in front of them */}
         {view.players.map((p, i) => (
-          <PlayerArea key={p.seat} p={p} area={areas[i]} active={!view.finished && glowTurn === p.seat} first={view.firstPlayer === p.seat} />
+          <PlayerSpot key={p.seat} p={p} zone={zones[i]} first={view.firstPlayer === p.seat} pending={view.pending?.seat === p.seat ? view.pending.kind : null} />
         ))}
 
         {/* In-flight components */}
@@ -213,6 +227,9 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
   )
 }
 
+/** Sounds play well below full level; the files themselves are already soft. */
+const SOUND_GAIN = 0.5
+
 // ——— Pieces ———
 function EmptySlot({ size }: { size: number }) {
   return (
@@ -221,160 +238,266 @@ function EmptySlot({ size }: { size: number }) {
         width: size,
         height: size * CARD_RATIO,
         borderRadius: size * 0.07,
-        border: '2px dashed rgba(255,235,200,.25)',
-        background: 'rgba(0,0,0,.12)',
+        boxShadow: 'inset 0 0 0 2px rgba(255,235,200,.10), inset 0 0 24px rgba(0,0,0,.25)',
       }}
     />
   )
 }
 
+/** A face-down deck; its thickness hints at what's left (no numbers on the table). */
 function DeckStack({ tier, count, size }: { tier: Tier; count: number; size: number }) {
-  const layers = Math.min(4, Math.ceil(count / 6))
+  const layers = Math.min(5, Math.ceil(count / 5))
   return (
     <div style={{ position: 'relative', width: size, height: size * CARD_RATIO }}>
-      {Array.from({ length: layers }, (_, i) => (
-        <CardBack key={i} tier={tier} size={size} style={{ position: 'absolute', left: -(layers - 1 - i) * 2, top: -(layers - 1 - i) * 2 }} />
-      ))}
-      <CountBadge n={count} style={{ position: 'absolute', right: -8, bottom: -8, fontSize: 18 }} />
+      {Array.from({ length: layers }, (_, i) => {
+        const off = (layers - 1 - i) * 2.5
+        return <CardBack key={i} tier={tier} size={size} style={{ position: 'absolute', left: -off, top: -off }} />
+      })}
     </div>
   )
 }
 
-function Banner({ view, seq }: { view: SplendorTableView; seq: number }) {
-  const turnName = view.players.find((p) => p.seat === view.turn)?.name ?? ''
-  let text: ReactNode = view.lastAction?.summary ?? `${turnName} goes first`
-  if (view.pending?.kind === 'discard') text = `${nameOf(view, view.pending.seat)} is returning tokens…`
-  if (view.pending?.kind === 'noble') text = `${nameOf(view, view.pending.seat)} is choosing a noble…`
-  return (
-    <div style={{ position: 'absolute', left: 560, width: 800, top: 18, display: 'flex', justifyContent: 'center', gap: 12 }}>
-      <div
-        key={`${seq}-${String(text)}`}
-        className="spl-banner spl-serif"
-        style={{
-          padding: '8px 26px',
-          borderRadius: 999,
-          background: 'linear-gradient(180deg, rgba(250,240,215,.95), rgba(225,205,165,.95))',
-          color: '#3b2412',
-          fontSize: 26,
-          boxShadow: '0 4px 14px rgba(0,0,0,.45)',
-          whiteSpace: 'nowrap',
-          maxWidth: 800,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {text}
-      </div>
-      {view.endTriggered && !view.finished && (
-        <div className="spl-banner spl-serif" style={{ padding: '8px 18px', borderRadius: 999, background: '#7f1d1d', color: '#fde68a', fontSize: 24, boxShadow: '0 4px 14px rgba(0,0,0,.45)' }}>
-          Final round!
-        </div>
-      )}
-    </div>
-  )
-}
-
-const nameOf = (view: SplendorTableView, seat: number) => view.players.find((p) => p.seat === seat)?.name ?? `Player ${seat + 1}`
-
-function PlayerArea({ p, area, active, first }: { p: PublicPlayer; area: Area; active: boolean; first: boolean }) {
-  const hex = seatHex(p.color)
-  const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
+function FinalRoundSeal() {
   return (
     <div
-      className="spl-glow"
+      className="spl-pop spl-serif"
       style={{
         position: 'absolute',
-        left: area.x,
-        top: area.y,
-        width: area.w,
-        height: area.h,
-        borderRadius: 18,
-        padding: 14,
-        background: 'rgba(20,12,6,.35)',
-        outline: `3px solid ${active ? hex : 'rgba(255,255,255,.08)'}`,
-        boxShadow: active ? `0 0 28px 6px ${hex}aa, inset 0 0 22px ${hex}55` : '0 0 0 rgba(0,0,0,0)',
+        left: MARKET_X - 30,
+        top: NOBLES_Y + 18,
+        width: 104,
+        height: 104,
+        borderRadius: '50%',
+        background: 'radial-gradient(circle at 38% 32%, #b91c1c, #7f1d1d 70%, #5b1414)',
+        boxShadow: '0 4px 10px rgba(0,0,0,.5), inset 0 0 0 4px rgba(255,255,255,.08)',
+        color: '#fde68a',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        fontSize: 22,
+        lineHeight: 1.05,
+        transform: 'rotate(-8deg)',
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, height: 44 }}>
-        <span style={{ width: 18, height: 18, borderRadius: '50%', background: hex, boxShadow: '0 0 0 2px rgba(0,0,0,.4)' }} />
-        <span className="spl-serif" style={{ fontSize: 30, color: '#fef3c7', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {p.name}
-          {first && <span title="First player" style={{ fontSize: 18, marginLeft: 10, color: '#fcd34d' }}>① first</span>}
-        </span>
-        <span className="spl-numeral" style={{ fontSize: 44 }}>
-          {p.points}
-        </span>
-        <span style={{ color: '#fcd34d', fontSize: 22 }}>pts</span>
-      </div>
-
-      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
-        {/* Tableau: one column per colour; covered cards show only their top band */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {columns.map(({ gem, cards }) => (
-            <TableauColumn key={gem} seat={p.seat} gem={gem} cards={cards} />
-          ))}
-        </div>
-
-        {/* Reserved (always face-down on the table) + nobles */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: 13, color: 'rgba(254,243,199,.7)', letterSpacing: 1 }}>RESERVED</span>
-          {[0, 1, 2].map((i) => (
-            <div key={i} data-anchor={`p${p.seat}-res-${i}`}>
-              {p.reserved[i] ? (
-                <CardBack tier={p.reserved[i].tier} size={RES} />
-              ) : (
-                <div style={{ width: RES, height: RES * CARD_RATIO, borderRadius: 5, border: '1.5px dashed rgba(255,235,200,.18)' }} />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tokens */}
-      <div style={{ display: 'flex', gap: 14, marginTop: 12, alignItems: 'center' }}>
-        {TOKENS.map((t) => (
-          <div key={t} data-anchor={`p${p.seat}-tok-${t}`} style={{ position: 'relative', opacity: p.tokens[t] > 0 ? 1 : 0.22 }}>
-            <Token gem={t} size={PTOKEN} />
-            <CountBadge n={p.tokens[t]} style={{ position: 'absolute', right: -8, top: -6, fontSize: 13 }} />
-          </div>
-        ))}
-        <span style={{ color: 'rgba(254,243,199,.75)', fontSize: 16, marginLeft: 4 }}>{p.tokenCount}/10</span>
-      </div>
-
-      {/* Nobles won */}
-      <div data-anchor={`p${p.seat}-nobles`} style={{ display: 'flex', gap: 8, marginTop: 10, minHeight: 64 }}>
-        {p.nobles.map((id) => (
-          <div key={id} data-anchor={`p${p.seat}-noble-${id}`}>
-            <NobleTile id={id} size={64} />
-          </div>
-        ))}
-      </div>
+      Final
+      <br />
+      round
     </div>
   )
 }
 
-function TableauColumn({ seat, gem, cards }: { seat: number; gem: Gem; cards: string[] }) {
-  const h = MINI * CARD_RATIO
-  const peek = h * TABLEAU_PEEK
+function TurnGlow({ zone, hex, on }: { zone: Zone; hex: string; on: boolean }) {
   return (
-    <div style={{ width: MINI, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, height: 26, opacity: cards.length ? 1 : 0.35 }}>
-        <GemImg gem={gem} size={22} />
-        <span className="spl-numeral" style={{ fontSize: 22 }}>
-          {cards.length}
+    <div
+      style={{
+        position: 'absolute',
+        left: zone.x - 40,
+        top: zone.y - 30,
+        width: zone.w + 80,
+        height: zone.h + 60,
+        background: `radial-gradient(ellipse 60% 55% at 50% 50%, ${hex}55 0%, ${hex}22 45%, rgba(0,0,0,0) 75%)`,
+        opacity: on ? 1 : 0,
+        transition: 'opacity 700ms ease',
+        pointerEvents: 'none',
+      }}
+    />
+  )
+}
+
+/** Wraps a piece in an unrotated anchor box and lays the piece down slightly askew. */
+function Loose({
+  anchor,
+  seed,
+  w,
+  h,
+  deg = 2.5,
+  px = 4,
+  tilt = 0,
+  style,
+  children,
+}: {
+  anchor?: string
+  seed: string
+  w: number
+  h: number
+  deg?: number
+  px?: number
+  /** A deliberate extra rotation (e.g. fanning reserved cards), on top of the jitter. */
+  tilt?: number
+  style?: CSSProperties
+  children: ReactNode
+}) {
+  const j = jitter(seed, deg, px)
+  const rot = j.rot + tilt
+  return (
+    <div data-anchor={anchor} data-rot={anchor ? rot : undefined} style={{ position: 'absolute', width: w, height: h, ...style }}>
+      <div style={{ width: w, height: h, transform: `translate(${j.dx}px, ${j.dy}px) rotate(${rot}deg)` }}>{children}</div>
+    </div>
+  )
+}
+
+function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; first: boolean; pending: 'discard' | 'noble' | null }) {
+  const pr = zone.profile
+  const miniH = pr.mini * CARD_RATIO
+  const colGap = Math.floor((zone.w - pr.mini * 5) / 4)
+  const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
+  const tallest = Math.max(1, ...columns.map((c) => c.cards.length))
+  const peek = Math.min(miniH * TABLEAU_PEEK, tallest > 1 ? (pr.tableauCap - miniH) / (tallest - 1) : miniH)
+  const tableauH = Math.min(pr.tableauCap, miniH + (tallest - 1) * peek)
+
+  // Vertical flow: place card → tableau → tokens → reserved + nobles. Tall zones centre it.
+  const placeH = pr.disc + 6
+  const tokRise = pr.tok * 0.07 * 6
+  const contentH = placeH + 18 + pr.tableauCap + 26 + tokRise + pr.tok + 26 + pr.res * CARD_RATIO
+  const top = zone.y + Math.max(0, (zone.h - contentH) / 2)
+  const tableauY = top + placeH + 18
+  const tokY = tableauY + pr.tableauCap + 26 + tokRise
+  const lowY = tokY + pr.tok + 26
+  const tokGap = Math.floor((zone.w - pr.tok * 6) / 5)
+  const resStep = pr.res * 0.62
+
+  return (
+    <>
+      <PlaceCard p={p} x={zone.x} y={top} pr={pr} first={first} pending={pending} />
+
+      {/* Tableau: one column per colour; covered cards show only their top band */}
+      {columns.map(({ gem, cards }, ci) => {
+        const j = jitter(`p${p.seat}-col-${gem}`, 1.2, 3)
+        return (
+          <div
+            key={gem}
+            data-anchor={`p${p.seat}-col-${gem}`}
+            style={{
+              position: 'absolute',
+              left: zone.x + ci * (pr.mini + colGap) + j.dx,
+              top: tableauY + j.dy,
+              width: pr.mini,
+              height: cards.length ? tableauH : miniH,
+              transform: `rotate(${j.rot}deg)`,
+              transformOrigin: '50% 0',
+            }}
+          >
+            {cards.map((id, i) => (
+              <div key={id} data-anchor={`card-${id}`} data-rot={j.rot} style={{ position: 'absolute', left: 0, top: i * peek }}>
+                <Card id={id} size={pr.mini} />
+              </div>
+            ))}
+          </div>
+        )
+      })}
+
+      {/* Token stacks (an empty colour leaves bare table, but keeps its spot for flights) */}
+      {TOKENS.map((t, i) => (
+        <Loose key={t} anchor={`p${p.seat}-tok-${t}`} seed={`p${p.seat}-tok-${t}`} w={pr.tok} h={pr.tok} deg={0} px={5} style={{ left: zone.x + i * (pr.tok + tokGap), top: tokY }}>
+          <TokenPile gem={t} count={p.tokens[t]} size={pr.tok} ghost={false} />
+        </Loose>
+      ))}
+
+      {/* Reserved cards: always face-down, fanned a little */}
+      {[0, 1, 2].map((i) => (
+        <Loose
+          key={`res-${i}`}
+          anchor={`p${p.seat}-res-${i}`}
+          seed={`p${p.seat}-res-${i}`}
+          w={pr.res}
+          h={pr.res * CARD_RATIO}
+          deg={3}
+          px={2}
+          tilt={(i - 1) * 5}
+          style={{ left: zone.x + i * resStep, top: lowY }}
+        >
+          {p.reserved[i] ? <CardBack tier={p.reserved[i].tier} size={pr.res} /> : null}
+        </Loose>
+      ))}
+
+      {/* Nobles won */}
+      {p.nobles.map((id, i) => (
+        <Loose
+          key={id}
+          anchor={`p${p.seat}-noble-${id}`}
+          seed={`p${p.seat}-noble-${id}`}
+          w={pr.noble}
+          h={pr.noble}
+          deg={4}
+          px={3}
+          style={{ left: zone.x + pr.res + 2 * resStep + 28 + i * (pr.noble * 0.7), top: lowY + 4 }}
+        >
+          <NobleTile id={id} size={pr.noble} />
+        </Loose>
+      ))}
+    </>
+  )
+}
+
+/** A parchment tent card with the player's name, beside a wooden score disc. */
+function PlaceCard({ p, x, y, pr, first, pending }: { p: PublicPlayer; x: number; y: number; pr: Profile; first: boolean; pending: 'discard' | 'noble' | null }) {
+  const hex = seatHex(p.color)
+  const j = jitter(`place-${p.seat}`, 2, 2)
+  return (
+    <div style={{ position: 'absolute', left: x + j.dx, top: y + j.dy, display: 'flex', alignItems: 'center', gap: 10, transform: `rotate(${j.rot}deg)` }}>
+      <div
+        style={{
+          position: 'relative',
+          width: pr.disc,
+          height: pr.disc,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle at 35% 30%, #a0703f, #6b4423 65%, #4a2e17)',
+          boxShadow: `0 3px 8px rgba(0,0,0,.5), inset 0 0 0 3px ${hex}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <span className="spl-numeral" style={{ fontSize: pr.disc * 0.56 }}>
+          {p.points}
         </span>
       </div>
-      <div data-anchor={`p${seat}-col-${gem}`} style={{ position: 'relative', width: MINI, height: cards.length ? h + (cards.length - 1) * peek : h }}>
-        {cards.length === 0 && (
-          <div style={{ width: MINI, height: h, borderRadius: 6, border: '1.5px dashed rgba(255,235,200,.15)' }} />
-        )}
-        {cards.map((id, i) => (
-          <div key={id} data-anchor={`card-${id}`} style={{ position: 'absolute', left: 0, top: i * peek }}>
-            <Card id={id} size={MINI} />
+      <div
+        className="spl-serif"
+        style={{
+          padding: `${pr.name * 0.2}px ${pr.name * 0.6}px`,
+          borderRadius: 4,
+          background: 'linear-gradient(180deg, #f3e9d2 0%, #e6d6b2 55%, #d6c29a 100%)',
+          boxShadow: '0 3px 6px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.6)',
+          color: '#3b2412',
+          fontSize: pr.name,
+          lineHeight: 1.1,
+          maxWidth: SIDE_W - pr.disc - 70,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          borderLeft: `5px solid ${hex}`,
+        }}
+      >
+        {p.name}
+        {pending && (
+          <div style={{ fontSize: pr.name * 0.55, fontStyle: 'italic', opacity: 0.75 }}>
+            {pending === 'noble' ? 'choosing a noble…' : 'returning tokens…'}
           </div>
-        ))}
+        )}
       </div>
+      {first && (
+        <div
+          title="First player"
+          className="spl-serif"
+          style={{
+            width: pr.disc * 0.55,
+            height: pr.disc * 0.55,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle at 35% 30%, #fde68a, #d4a017 70%, #9a7410)',
+            boxShadow: '0 2px 5px rgba(0,0,0,.45)',
+            color: '#4a3208',
+            fontSize: pr.disc * 0.3,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          1
+        </div>
+      )}
     </div>
   )
 }
@@ -388,10 +511,11 @@ function Standings({ view }: { view: SplendorTableView }) {
         style={{
           minWidth: 640,
           padding: '34px 48px',
-          borderRadius: 24,
+          borderRadius: 10,
           background: 'linear-gradient(180deg, #f8f0dc, #e4d3ac)',
           boxShadow: '0 20px 60px rgba(0,0,0,.6)',
           color: '#3b2412',
+          transform: 'rotate(-1deg)',
         }}
       >
         <div className="spl-title" style={{ fontSize: 56, textAlign: 'center', marginBottom: 18 }}>
@@ -421,8 +545,13 @@ function Standings({ view }: { view: SplendorTableView }) {
 // ——— Animation planning ———
 type Sound = { name: string; at: number; volume?: number }
 
-const FLY = 520
-const STAGGER = 60
+// Motion timings (play-test: slower than before, gentle ease, whole turn ≤ ~2.5 s).
+const CHIP_FLY = 640
+const CARD_FLY = 780
+const REFILL_FLY = 760
+const NOBLE_FLY = 880
+const STAGGER = 90
+export const MAX_TURN_MS = 2500
 
 export function planAnimation(
   events: { type: string; [k: string]: unknown }[],
@@ -452,7 +581,7 @@ export function planAnimation(
     const size = Math.min(b.w, b.h)
     const src = { x: a.x + (a.w - Math.min(a.w, a.h)) / 2, y: a.y, w: Math.min(a.w, a.h), h: Math.min(a.w, a.h) }
     const dst = { x: b.x + (b.w - size) / 2, y: b.y + (b.h - size) / 2, w: size, h: size }
-    return { from: src, to: dst, node: <Token gem={gem} size={size} />, delay, duration: 430, lift: 30 }
+    return { from: src, to: dst, node: <Token gem={gem} size={size} />, delay, duration: CHIP_FLY, lift: 36 }
   }
   const expand = (gems: Partial<Record<TokenKind, number>>) =>
     TOKENS.flatMap((g) => Array.from({ length: gems[g] ?? 0 }, () => g))
@@ -463,7 +592,7 @@ export function planAnimation(
         const seat = e.seat as number
         const list = expand(e.gems as Partial<Record<TokenKind, number>>)
         list.forEach((g, i) => add(chip(g, `bank-${g}`, `p${seat}-tok-${g}`, t + i * STAGGER)))
-        sounds.push({ name: list.length > 1 ? 'chip-multi' : 'chip-single', at: t + 330 })
+        sounds.push({ name: list.length > 1 ? 'chip-multi' : 'chip-single', at: t + CHIP_FLY - 120 })
         t = end
         break
       }
@@ -471,7 +600,7 @@ export function planAnimation(
         const seat = e.seat as number
         const list = expand(e.gems as Partial<Record<TokenKind, number>>)
         list.forEach((g, i) => add(chip(g, `p${seat}-tok-${g}`, `bank-${g}`, t + i * STAGGER)))
-        sounds.push({ name: list.length > 1 ? 'chip-multi' : 'chip-single', at: t + 330 })
+        sounds.push({ name: list.length > 1 ? 'chip-multi' : 'chip-single', at: t + CHIP_FLY - 120 })
         t = end
         break
       }
@@ -498,17 +627,17 @@ export function planAnimation(
               <Card id={cardId} size={b.w} />
             ),
             delay: t,
-            duration: FLY + 120,
+            duration: CARD_FLY,
             flip: fromReserve,
             lift: 60,
           })
           sounds.push({ name: 'card-slide', at: t })
-          if (fromReserve) sounds.push({ name: 'card-flip', at: t + 300 })
+          if (fromReserve) sounds.push({ name: 'card-flip', at: t + CARD_FLY / 2 })
         }
         const paid = expand(e.paid as Partial<Record<TokenKind, number>>)
-        paid.forEach((g, i) => add(chip(g, `p${seat}-tok-${g}`, `bank-${g}`, t + 160 + i * STAGGER)))
-        if (paid.length) sounds.push({ name: 'chip-multi', at: t + 160 + 330, volume: 0.8 })
-        t = t + 380
+        paid.forEach((g, i) => add(chip(g, `p${seat}-tok-${g}`, `bank-${g}`, t + 220 + i * STAGGER)))
+        if (paid.length) sounds.push({ name: paid.length > 1 ? 'chip-multi' : 'chip-single', at: t + 220 + CHIP_FLY - 120, volume: 0.8 })
+        t = t + 420
         break
       }
       case 'cardReserved': {
@@ -533,27 +662,27 @@ export function planAnimation(
                   </div>
                 ),
                 delay: t,
-                duration: FLY + 120,
+                duration: CARD_FLY,
                 flip: true,
                 lift: 60,
               })
-              sounds.push({ name: 'card-slide', at: t }, { name: 'card-flip', at: t + 280 })
+              sounds.push({ name: 'card-slide', at: t }, { name: 'card-flip', at: t + CARD_FLY / 2 })
             }
           } else {
             const a = rect(from, `deck-${tier}`)
             if (a) {
-              add({ from: a, to: b, node: <CardBack tier={tier} size={b.w} />, delay: t, duration: FLY, lift: 50 })
+              add({ from: a, to: b, node: <CardBack tier={tier} size={b.w} />, delay: t, duration: CARD_FLY, lift: 50 })
               sounds.push({ name: 'card-slide', at: t })
             }
           }
         }
-        t = t + 360
+        t = t + 420
         break
       }
       case 'goldGained': {
         const seat = e.seat as number
         add(chip('gold', 'bank-gold', `p${seat}-tok-gold`, t))
-        sounds.push({ name: 'chip-single', at: t + 330 })
+        sounds.push({ name: 'chip-single', at: t + CHIP_FLY - 120 })
         break
       }
       case 'slotRefilled': {
@@ -563,7 +692,9 @@ export function planAnimation(
         const b = rect(to, slotA)
         if (a && b) {
           hidden.push(slotA)
-          const at = Math.max(t, 280)
+          // The deck deals once the taken card has cleared the slot: one fluid slide + flip,
+          // landing exactly in that slot (the slot box keeps its size while it's empty).
+          const at = Math.max(t, 360)
           add({
             from: a,
             to: b,
@@ -574,11 +705,11 @@ export function planAnimation(
               </div>
             ),
             delay: at,
-            duration: FLY + 80,
+            duration: REFILL_FLY,
             flip: true,
-            lift: 24,
+            lift: 28,
           })
-          sounds.push({ name: 'deck-deal', at }, { name: 'card-flip', at: at + 320 })
+          sounds.push({ name: 'deck-deal', at })
         }
         break
       }
@@ -590,13 +721,13 @@ export function planAnimation(
         if (a && b) {
           hidden.push(`p${seat}-noble-${id}`)
           const at = Math.max(end, t)
-          add({ from: a, to: b, node: <NobleTile id={id} size={b.w} />, delay: at, duration: FLY + 180, lift: 90 })
+          add({ from: a, to: b, node: <NobleTile id={id} size={b.w} />, delay: at, duration: NOBLE_FLY, lift: 90 })
           sounds.push({ name: 'noble-chime', at })
         }
         break
       }
       case 'turnChanged':
-        sounds.push({ name: 'turn-tick', at: Math.max(end, t), volume: 0.7 })
+        sounds.push({ name: 'turn-tick', at: Math.max(end, t), volume: 0.5 })
         break
       case 'gameOver':
         sounds.push({ name: 'fanfare', at: Math.max(end, t) })
@@ -611,6 +742,5 @@ export function planAnimation(
   if (reduced) {
     return { flyers, hidden, sounds, total: Math.min(Math.max(end, 200), 400) }
   }
-  // Keep a whole turn comfortably under ~2s.
-  return { flyers, hidden, sounds, total: Math.min(Math.max(end, 150), 2000) }
+  return { flyers, hidden, sounds, total: Math.min(Math.max(end, 150), MAX_TURN_MS) }
 }

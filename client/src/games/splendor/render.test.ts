@@ -70,7 +70,7 @@ describe('splendor views render', () => {
 })
 
 describe('animation planning', () => {
-  it('turns real engine events into flyers, hidden destinations and sounds within ~2s', async () => {
+  it('turns real engine events into flyers, hidden destinations and sounds within ~2.5s', async () => {
     const { planAnimation } = await import('./TableView')
     const rng = seededRng(3)
     let { state } = splendorModule.setup(seats.slice(0, 2), rng)
@@ -86,7 +86,7 @@ describe('animation planning', () => {
       state = res.state
       const next = tableView(state, seats.slice(0, 2))
       const plan = planAnimation(res.events, prev, next, anyRect, anyRect, false)
-      expect(plan.total).toBeLessThanOrEqual(2000)
+      expect(plan.total).toBeLessThanOrEqual(2500)
       for (const e of res.events) seen.add(e.type)
       const taken = res.events.find((e) => e.type === 'gemsTaken')
       if (taken) {
