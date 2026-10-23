@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Ensure shared PostgreSQL container is running
-CONTAINER_NAME="raise-the-bones-postgres"
+CONTAINER_NAME="sage-shared-dev-postgres"
 
 # Check if container exists and is running
 if docker ps -q -f name=$CONTAINER_NAME | grep -q .; then
@@ -21,8 +21,8 @@ else
         -p 5432:5432 \
         -e POSTGRES_PASSWORD=localdev123 \
         -e POSTGRES_USER=postgres \
-        -v raise-the-bones-postgres-data:/var/lib/postgresql/data \
-        postgres:15
+        -v sage-shared-dev-postgres-data:/var/lib/postgresql/data \
+        postgres:16
     
     echo "✓ PostgreSQL container created and started"
     echo "⏳ Waiting for PostgreSQL to be ready..."

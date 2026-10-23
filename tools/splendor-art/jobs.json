@@ -1,0 +1,311 @@
+[
+ {
+  "name": "gem-white",
+  "prompt": "a brilliant round cut clear white diamond, sparkling facets, crown facing viewer, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 100,
+  "steps": 20
+ },
+ {
+  "name": "gem-blue",
+  "prompt": "a deep royal blue sapphire smooth oval cabochon, polished dome, star-like inner glow, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 101,
+  "steps": 20
+ },
+ {
+  "name": "gem-green",
+  "prompt": "a deep green emerald gemstone with a rectangular emerald step cut, wider than tall, clipped corners, vivid saturated green, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 151,
+  "steps": 20
+ },
+ {
+  "name": "gem-red",
+  "prompt": "a deep crimson red ruby with cushion cut rounded square shape, faceted, vivid saturated red, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 103,
+  "steps": 20
+ },
+ {
+  "name": "gem-black",
+  "prompt": "a smoky dark brown translucent smoky quartz gemstone with a rectangular emerald step cut, many flat faceted steps, glassy, dark brown-black color, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 150,
+  "steps": 20
+ },
+ {
+  "name": "gem-gold",
+  "prompt": "a small glowing amber-gold translucent square tablet, like a square piece of amber resin, with ancient embossed symbols stamped on its face, warm orange-gold color, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 152,
+  "steps": 20
+ },
+ {
+  "name": "scene-t1-blue",
+  "prompt": "a sunny lakeside with green rice terraces, a wooden dock and a wooden well hoist frame, a farmer with an ox wading in the shallow water, pale blue sky, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 250,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t1-red",
+  "prompt": "an old stone mine doorway with a heavy wooden frame in a dense jungle, everything bathed in deep red light, red earth path, ferns, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 251,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t1-green",
+  "prompt": "a vast terraced open-pit quarry carved into a jungle hillside, tiny workers on the terraces, hanging vines, warm yellow-green light, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 252,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t1-white",
+  "prompt": "a small mine entrance with timber supports on a snowy mountain slope, porters with packs climbing through the snow, white misty peaks, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 253,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t1-black",
+  "prompt": "a timber-framed mine entrance cut into a dark brown hillside with mine-cart rails, camel caravan silhouettes on the ridge against an orange sunset, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 254,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t2-white",
+  "prompt": "two heavily laden porters with large bundled packs on their backs trudging through a blizzard on a snowy mountain pass, cold blue-white light, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 255,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t2-blue",
+  "prompt": "a caravan of elephants carrying covered wooden howdahs and cargo crossing grassy hills toward a misty blue lake, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 256,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t2-green",
+  "prompt": "a Spanish galleon with billowing cream sails sailing past green coastal hills on calm green water, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 257,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t2-red",
+  "prompt": "traditional wooden sailing boats with red sails beached on a riverbank at a fiery orange-red sunset, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 258,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t2-black",
+  "prompt": "a camel caravan laden with crates crossing red desert dunes at dusk, warm dark brown and red tones, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 259,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t3-white",
+  "prompt": "a white marble Renaissance palazzo with a long arcade of arches and striped awnings, a man sitting on the steps, bright pale light, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 260,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t3-blue",
+  "prompt": "a colorful onion-domed Russian cathedral beside a canal with a small boat, timber houses, pale blue sky, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 261,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t3-green",
+  "prompt": "a narrow medieval street of black-and-white Tudor half-timbered houses with leaded windows, soft green-tinted light, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 262,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t3-red",
+  "prompt": "an ornate red brick gothic palazzo on a city corner, people walking below, warm red-orange light, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 263,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "scene-t3-black",
+  "prompt": "a narrow cobbled medieval alley with warm glowing shop windows and a hanging jewelry store sign, people in Renaissance clothes, sepia brown tones, detailed painterly digital oil painting, historical illustration, rich saturated colors, soft atmospheric lighting, calm open sky in the upper part, wide establishing view",
+  "width": 832,
+  "height": 1152,
+  "seed": 264,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-01",
+  "prompt": "a pale serene Renaissance noblewoman in a black widow veil and black gown with a gold medallion pendant, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 450,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-02",
+  "prompt": "a stern bearded nobleman knight in ornate polished bronze plate armor, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 451,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-03",
+  "prompt": "a French Renaissance king with a dark beard wearing a black and gold striped doublet and a black feathered hat, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 452,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-04",
+  "prompt": "a broad-faced red-bearded Tudor king like Henry VIII in a flat black hat and a red embroidered doublet with a heavy gold chain, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 453,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-05",
+  "prompt": "a young Renaissance lady in a dark hood with gold trim and a tan bodice, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 454,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-06",
+  "prompt": "an elegant Renaissance noblewoman with auburn hair pinned up and a large white lace ruff collar, dark gown, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 455,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-07",
+  "prompt": "a stern Spanish Renaissance queen wearing a gold crown over a white headdress and a green and white gown, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 456,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-08",
+  "prompt": "an elderly Ottoman sultan with a long white beard and a tall white turban, red and gold robe, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 457,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-09",
+  "prompt": "a sharp-featured dark-haired Renaissance statesman in a dark red robe standing before a red curtain, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 458,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "noble-n-10",
+  "prompt": "a regal red-haired Elizabethan queen with a white lace ruff and a crimson gown, Renaissance oil painting portrait by Hans Holbein the Younger, museum masterpiece, visible brushstrokes, dignified, fully clothed in heavy formal court attire, head and shoulders, dark muted palace background, warm candlelight",
+  "width": 1024,
+  "height": 1024,
+  "seed": 459,
+  "steps": 30,
+  "model": "sdxl"
+ },
+ {
+  "name": "back-engraving",
+  "prompt": "antique sepia copperplate engraving, close-up of a scholar hand holding a feather quill pen and writing on a sheet of paper, the scholar sleeve and a dark densely crosshatched background fill the whole image, fine engraved lines, vintage etching, monochrome brown ink",
+  "width": 832,
+  "height": 1152,
+  "seed": 430,
+  "steps": 30,
+  "model": "sdxl",
+  "negative": "text, letters, words, writing, watermark, signature, frame, border, margin, deformed hand, extra fingers, color"
+ },
+ {
+  "name": "back-noble-engraving",
+  "prompt": "a monochrome sepia antique copperplate engraving of a Renaissance horseman riding a horse past city towers, fine crosshatching lines, vintage print texture, the engraving fills the entire frame edge-to-edge, no paper margin, no caption, no letters",
+  "width": 1024,
+  "height": 1024,
+  "seed": 421,
+  "steps": 20
+ },
+ {
+  "name": "parchment",
+  "prompt": "top-down macro texture of old weathered parchment paper, mottled tan and cream tones, visible paper fibers, faint brown stains and faded ink smudges, soft even lighting, full frame",
+  "width": 1024,
+  "height": 1024,
+  "seed": 440,
+  "steps": 30,
+  "model": "sdxl",
+  "negative": "text, letters, words, writing, watermark, frame, border, objects, shadow"
+ },
+ {
+  "name": "table",
+  "prompt": "a flat top-down seamless texture of a dark polished walnut wood tabletop, rich brown grain, evenly lit, full frame, no objects, no text",
+  "width": 1024,
+  "height": 1024,
+  "seed": 403,
+  "steps": 20
+ }
+]

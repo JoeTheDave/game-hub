@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { fetchApi } from '../lib/api'
-import type { GameInstance } from '../types/game'
 import { PHONE_SCREEN_CLASS } from '../lib/phoneScreen'
+import { loadSeat, saveSeat } from '../lib/seat'
+import type { GameInstance } from '../types/game'
 
-/** Full viewport, no header. Auto-joins with "Player N" and redirects to controller. */
-const viewportClass = PHONE_SCREEN_CLASS
-
+/** Full viewport, no header. Auto-joins with "Player N" and redirects to the phone screen. */
 export function JoinGamePage() {
   const { joinCode } = useParams<{ joinCode: string }>()
   const navigate = useNavigate()
@@ -14,6 +13,7 @@ export function JoinGamePage() {
   const [loading, setLoading] = useState(true)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
+  const triedJoin = useRef<string | null>(null)
 
   useEffect(() => {
     if (!joinCode) {
@@ -30,102 +30,51 @@ export function JoinGamePage() {
       .finally(() => setLoading(false))
   }, [joinCode])
 
-  const triedJoinForInstanceId = React.useRef<string | null>(null)
   useEffect(() => {
-    if (!instance || joining || error || triedJoinForInstanceId.current === instance.id) return
-    const status = (instance.gameState as { status?: string } | null)?.status
-    const requiredPlayerCount = (instance.gameState as { requiredPlayerCount?: number } | null)?.requiredPlayerCount ?? 2
-    if (status !== 'lobby') return
-    if (instance.players.length >= requiredPlayerCount) return
+    if (!instance || joining || error || triedJoin.current === instance.id) return
+    const playPath = `/play/${instance.game.slug}/${instance.id}`
 
-    const stored = (() => {
-      try {
-        const v = sessionStorage.getItem(`game:${instance.id}:playerOrder`)
-        return v != null ? parseInt(v, 10) : undefined
-      } catch {
-        return undefined
-      }
-    })()
-    if (stored !== undefined && stored >= 0 && instance.players.some((p) => p.playerOrder === stored)) {
-      const gameSlug = instance.game?.slug ?? 'tic-tac-toe'
-      navigate(`/play/${gameSlug}/${instance.id}`, { state: { playerOrder: stored } })
-      return
-    }
-
-    triedJoinForInstanceId.current = instance.id
+    triedJoin.current = instance.id
     setJoining(true)
-    fetchApi(`/api/games/instances/${instance.id}/join`, {
-      method: 'POST',
-      body: JSON.stringify({ screenName: '' }),
-    })
-      .then((res) => {
-        if (!res.ok) return res.json().then((d) => Promise.reject(new Error(d.error || 'Failed to join')))
-        return res.json()
-      })
-      .then(({ player }: { player: { playerOrder: number; joinToken?: string } }) => {
-        try {
-          sessionStorage.setItem(`game:${instance.id}:playerOrder`, String(player.playerOrder))
-          if (player.joinToken) {
-            sessionStorage.setItem(`game:${instance.id}:joinToken`, player.joinToken)
-          }
-        } catch {
-          // ignore
-        }
-        const gameSlug = instance.game?.slug ?? 'tic-tac-toe'
-        navigate(`/play/${gameSlug}/${instance.id}`, {
-          state: { playerOrder: player.playerOrder, joinToken: player.joinToken },
-        })
+    ;(async () => {
+      // Already seated on this device (e.g. re-scanned the QR) with a seat the server still accepts: go straight back.
+      const seat = loadSeat(instance.id)
+      if (seat) {
+        const qs = new URLSearchParams({ playerOrder: String(seat.playerOrder), joinToken: seat.joinToken })
+        const me = await fetchApi(`/api/games/instances/${instance.id}/me?${qs}`).catch(() => null)
+        if (me?.ok) return { seated: true as const }
+      }
+      if (instance.phase !== 'lobby' || instance.players.length >= instance.game.maxPlayers) return { seated: false as const }
+      const res = await fetchApi(`/api/games/instances/${instance.id}/join`, { method: 'POST', body: JSON.stringify({ screenName: '' }) })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || 'Failed to join')
+      }
+      const { player } = (await res.json()) as { player: { playerOrder: number; joinToken: string } }
+      saveSeat(instance.id, { playerOrder: player.playerOrder, joinToken: player.joinToken })
+      return { seated: true as const }
+    })()
+      .then(({ seated }) => {
+        if (seated) navigate(playPath, { replace: true })
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to join'))
       .finally(() => setJoining(false))
   }, [instance, joining, error, navigate])
 
-  if (loading) {
-    return (
-      <div className={`${viewportClass} items-center justify-center text-slate-400`}>
-        Loading…
-      </div>
-    )
-  }
-  if (!instance) {
-    return (
-      <div className={`${viewportClass} items-center justify-center px-4 text-center`}>
-        {error && <p className="text-red-400 mb-3 text-sm">{error}</p>}
-        <Link to="/" className="text-amber-400 hover:text-amber-300 text-sm">Back home</Link>
-      </div>
-    )
-  }
-  const status = (instance.gameState as { status?: string } | null)?.status
-  const requiredPlayerCount = (instance.gameState as { requiredPlayerCount?: number } | null)?.requiredPlayerCount ?? 2
-  if (status !== 'lobby') {
-    return (
-      <div className={`${viewportClass} items-center justify-center px-4 text-center`}>
-        <p className="text-slate-300 mb-3 text-sm">This game has already started.</p>
-        <Link to="/" className="text-amber-400 hover:text-amber-300 text-sm">Back home</Link>
-      </div>
-    )
-  }
-  if (instance.players.length >= requiredPlayerCount) {
-    return (
-      <div className={`${viewportClass} items-center justify-center px-4 text-center`}>
-        <p className="text-slate-300 mb-3 text-sm">This game is full.</p>
-        <Link to="/" className="text-amber-400 hover:text-amber-300 text-sm">Back home</Link>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className={`${viewportClass} items-center justify-center px-4 text-center`}>
-        <p className="text-red-400 mb-3 text-sm">{error}</p>
-        <Link to="/" className="text-amber-400 hover:text-amber-300 text-sm">Back home</Link>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`${viewportClass} items-center justify-center text-slate-400`}>
-      {joining ? 'Joining…' : 'Redirecting…'}
+  const message = (text: string, tone = 'text-slate-300') => (
+    <div className={`${PHONE_SCREEN_CLASS} items-center justify-center px-4 text-center`}>
+      <p className={`${tone} mb-3 text-sm`}>{text}</p>
+      <Link to="/" className="text-amber-400 hover:text-amber-300 text-sm">
+        Back home
+      </Link>
     </div>
   )
+
+  if (loading) return <div className={`${PHONE_SCREEN_CLASS} items-center justify-center text-slate-400`}>Loading…</div>
+  if (!instance) return message(error || 'Game not found', 'text-red-400')
+  if (error) return message(error, 'text-red-400')
+  if (!joining && instance.phase !== 'lobby') return message('This game has already started.')
+  if (!joining && instance.players.length >= instance.game.maxPlayers) return message('This game is full.')
+
+  return <div className={`${PHONE_SCREEN_CLASS} items-center justify-center text-slate-400`}>{joining ? 'Joining…' : 'Redirecting…'}</div>
 }

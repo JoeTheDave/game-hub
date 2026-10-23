@@ -6,9 +6,9 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { CreateGamePage } from './pages/CreateGamePage'
 import { JoinGamePage } from './pages/JoinGamePage'
-import { GameLobbyRoute } from './pages/GameLobbyRoute'
-import { GameViewRoute } from './pages/GameViewRoute'
-import { GameControllerRoute } from './pages/GameControllerRoute'
+import { HostLobbyPage } from './pages/HostLobbyPage'
+import { TablePage } from './pages/TablePage'
+import { PlayPage } from './pages/PlayPage'
 import { ErrorPage } from './pages/ErrorPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -23,8 +23,11 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Controller view: no header, full-screen (e.g. when joining via QR on mobile) */}
-          <Route path="/play/:gameSlug/:id" element={<GameControllerRoute />} />
+          {/* Phone: no header, full-screen (joined via QR) — shared lobby, then the game's PhoneView */}
+          <Route path="/play/:gameSlug/:id" element={<PlayPage />} />
+
+          {/* Table (TV): no header, full-screen — the game's TableView */}
+          <Route path="/game/:gameSlug/:id" element={<TablePage />} />
 
           {/* Join page: no header, landscape viewport fit (e.g. QR scan on mobile) */}
           <Route path="/join/:joinCode" element={<JoinGamePage />} />
@@ -35,8 +38,7 @@ function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/create-game" element={<RequireAuth><CreateGamePage /></RequireAuth>} />
-            <Route path="/lobby/:gameSlug/:id" element={<RequireAuth><GameLobbyRoute /></RequireAuth>} />
-            <Route path="/game/:gameSlug/:id" element={<RequireAuth><GameViewRoute /></RequireAuth>} />
+            <Route path="/lobby/:gameSlug/:id" element={<RequireAuth><HostLobbyPage /></RequireAuth>} />
           </Route>
 
           {/* Error page */}

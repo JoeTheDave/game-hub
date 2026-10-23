@@ -1,16 +1,12 @@
 #!/bin/bash
 
-# Ensure project database exists in shared PostgreSQL container
-DATABASE_NAME="game_hub_dev"
-CONTAINER_NAME="raise-the-bones-postgres"
+# Ensure the project's dev and test databases exist in the shared PostgreSQL container
+CONTAINER_NAME="sage-shared-dev-postgres"
 
-echo "📊 Ensuring database '$DATABASE_NAME' exists..."
-
-# Create database if it doesn't exist
-docker exec $CONTAINER_NAME psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DATABASE_NAME'" | grep -q 1 || {
-    echo "🏗️  Creating database '$DATABASE_NAME'..."
-    docker exec $CONTAINER_NAME createdb -U postgres $DATABASE_NAME
-    echo "✅ Database '$DATABASE_NAME' created successfully"
-}
-
-echo "✓ Database '$DATABASE_NAME' is ready"
+for DATABASE_NAME in game_hub_dev game_hub_test; do
+    docker exec $CONTAINER_NAME psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DATABASE_NAME'" | grep -q 1 || {
+        echo "🏗️  Creating database '$DATABASE_NAME'..."
+        docker exec $CONTAINER_NAME createdb -U postgres $DATABASE_NAME
+    }
+    echo "✓ Database '$DATABASE_NAME' is ready"
+done

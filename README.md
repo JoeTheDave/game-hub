@@ -27,7 +27,7 @@ npm run dev
 This project uses a **shared PostgreSQL container** approach to avoid port conflicts and abandoned containers when working with multiple game-hub projects.
 
 ### How it works
-- Single PostgreSQL container (`raise-the-bones-postgres`) shared across all projects
+- Single PostgreSQL container (`sage-shared-dev-postgres`) shared across all projects
 - Each project gets its own database (`game_hub_dev`) within the shared container
 - Container starts automatically when you run `npm run dev`
 

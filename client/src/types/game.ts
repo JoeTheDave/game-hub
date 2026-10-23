@@ -1,42 +1,46 @@
+/** Game catalog entry (GET /api/games). */
 export interface Game {
   id: string
   slug: string
   name: string
-  options: Record<string, unknown> | null
+  minPlayers: number
+  maxPlayers: number
 }
 
-export interface GameInstancePlayer {
+export type Phase = 'lobby' | 'playing' | 'finished'
+
+/** A seat as every viewer sees it (never includes a joinToken). */
+export interface LobbyPlayer {
   id: string
-  gameInstanceId: string
-  userId: string | null
+  playerOrder: number
   screenName: string
   color: string | null
-  joinToken: string | null
-  playerOrder: number
-  joinedAt: string
+  signedIn: boolean
 }
 
-/** Top-level instance status and optional requiredPlayerCount live in gameState. */
-export interface GameInstanceGameState {
-  status?: 'lobby' | 'in_progress' | 'finished'
-  requiredPlayerCount?: number
-  [key: string]: unknown
-}
-
+/** Lobby-safe instance: what the server sends to the TV and every phone. */
 export interface GameInstance {
   id: string
-  gameId: string
-  hostUserId: string
   joinCode: string
-  gameState: (GameInstanceGameState & TicTacToeState) | null
+  phase: Phase
+  version: number
+  hostUserId: string
   game: Game
-  hostUser: { id: string; email: string; name: string | null }
-  players: GameInstancePlayer[]
+  players: LobbyPlayer[]
+  /** The game's public tableView once started; null in the lobby. */
+  tableView: unknown
 }
 
-export interface TicTacToeState {
-  board?: string[][]
-  currentTurnPlayerOrder?: number
-  winner?: number | null
-  status?: 'playing' | 'won' | 'draw'
+/** Something that visibly happened (game-defined shape), for animation and sound. */
+export interface GameEvent {
+  type: string
+  [k: string]: unknown
+}
+
+/** The TV's update stream: the new instance plus the events that produced it. */
+export interface TableUpdate {
+  instance: GameInstance
+  events: GameEvent[]
+  /** Increments for every update, so views can key animations. */
+  seq: number
 }

@@ -44,8 +44,7 @@ export function CreateGamePage() {
         throw new Error(data.error || 'Failed to create game')
       }
       const data = await res.json()
-      const gameSlug = data.game?.slug ?? 'tic-tac-toe'
-      navigate(`/lobby/${gameSlug}/${data.id}`)
+      navigate(`/lobby/${data.game.slug}/${data.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create game')
     } finally {
@@ -72,7 +71,7 @@ export function CreateGamePage() {
           >
             {games.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                {g.name} ({g.minPlayers === g.maxPlayers ? g.minPlayers : `${g.minPlayers}–${g.maxPlayers}`} players)
               </option>
             ))}
           </select>
@@ -84,7 +83,7 @@ export function CreateGamePage() {
           type="button"
           onClick={handleCreate}
           disabled={creating || selectedGameId == null}
-          className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold disabled:opacity-50 transition-colors"
+          className="w-full py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold disabled:opacity-50 disabled:cursor-default cursor-pointer transition-colors"
         >
           {creating ? 'Creating…' : 'Create'}
         </button>

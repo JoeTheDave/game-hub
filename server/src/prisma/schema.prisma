@@ -39,7 +39,8 @@ model GameInstance {
   gameId     String
   hostUserId String
   joinCode   String   @unique // short code for QR / join URL
-  gameState  Json?    // game-specific state (includes status: lobby | in_progress | finished, board, turn, etc.)
+  gameState  Json?    // { phase: 'lobby' | 'playing' | 'finished', state?: <engine state> } — platform owns phase, engine owns state
+  version    Int      @default(0) // optimistic-concurrency counter, incremented on every gameState write
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
