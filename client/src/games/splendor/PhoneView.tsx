@@ -47,7 +47,7 @@ const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
 export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError }: PhoneViewProps<SplendorPlayerView, SplendorAction>) {
-  const [tab, setTab] = useState<Tab>('cards')
+  const [tab, setTab] = useState<Tab>('gems')
   const [sheet, setSheet] = useState<Sheet>(null)
   const me = view.players.find((p) => p.seat === playerOrder)
   const legal = view.legalActions

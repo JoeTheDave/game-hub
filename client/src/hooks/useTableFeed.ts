@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '../lib/api'
 import { useLiveSubscription } from './useSocket'
 import type { GameEvent, GameInstance, TableUpdate } from '../types/game'
+import { shouldAdvance } from '../lib/tableQueue'
 
 /** If a view never reports its animation finished, move on anyway after this long. */
 const MAX_ANIMATION_MS = 4000
@@ -18,6 +19,8 @@ export function useTableFeed(id: string | null) {
   const [loading, setLoading] = useState(true)
   const versionRef = useRef(-1)
   const seqRef = useRef(0)
+  /** seq of the update whose animation already finished (done() may arrive before the next update). */
+  const finishedSeqRef = useRef(-1)
 
   const resync = useCallback(async () => {
     if (!id) return
@@ -58,14 +61,19 @@ export function useTableFeed(id: string | null) {
 
   const current = queue[0] ?? null
   const done = useCallback(() => {
-    setQueue((q) => (q.length > 1 ? q.slice(1) : q))
+    setQueue((q) => {
+      if (q.length > 1) return q.slice(1)
+      // Nothing newer yet: remember this one finished so the next update shows immediately.
+      if (q[0]) finishedSeqRef.current = q[0].seq
+      return q
+    })
   }, [])
 
-  // Nothing to animate (or the view is stuck): advance to the next queued update.
+  // Finished (or nothing to animate): advance as soon as a newer update is queued.
   useEffect(() => {
     if (!current || queue.length < 2) return
-    if (current.events.length === 0) {
-      done()
+    if (shouldAdvance(current, queue.length, finishedSeqRef.current)) {
+      setQueue((q) => (q.length > 1 ? q.slice(1) : q))
       return
     }
     const t = window.setTimeout(done, MAX_ANIMATION_MS)
