@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { fetchApi } from '../lib/api'
 import type { GameInstance } from '../types/game'
+import { PHONE_SCREEN_CLASS } from '../lib/phoneScreen'
 
 /** Full viewport, no header. Auto-joins with "Player N" and redirects to controller. */
-const viewportClass = 'h-dvh max-h-dvh w-full overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
+const viewportClass = PHONE_SCREEN_CLASS
 
 export function JoinGamePage() {
   const { joinCode } = useParams<{ joinCode: string }>()

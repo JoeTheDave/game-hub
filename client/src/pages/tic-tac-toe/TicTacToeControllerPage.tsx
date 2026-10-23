@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'react-router-dom'
 import { fetchApi } from '../../lib/api'
 import { useSubscribeGame } from '../../hooks/useSocket'
 import type { GameInstance, TicTacToeState } from '../../types/game'
+import { PHONE_SCREEN_CLASS } from '../../lib/phoneScreen'
 
 const PLAYER_COLORS = ['red', 'blue', 'green', 'yellow', 'orange', 'purple'] as const
 const COLOR_CLASSES: Record<string, string> = {
@@ -22,7 +23,11 @@ const MARK_TEXT_CLASSES: Record<string, string> = {
   purple: 'text-purple-500',
 }
 
-/** Controller view for Tic-Tac-Toe (player device). No header. Portrait: info top, board below; landscape: info left, board right. No scroll. */
+/**
+ * Controller view for Tic-Tac-Toe (player device). No header, never scrolls.
+ * Lobby: name/color + roster; seat 0 is the game admin and gets Start Game once the lobby is full.
+ * In game: portrait = info top, board below; landscape = info left, board right.
+ */
 export function TicTacToeControllerPage() {
   const { id } = useParams<{ id: string }>()
   const location = useLocation()
@@ -56,6 +61,7 @@ export function TicTacToeControllerPage() {
   const [loading, setLoading] = useState(true)
   const [makingMove, setMakingMove] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState('')
   const [pendingName, setPendingName] = useState('')
   const [pendingColor, setPendingColor] = useState<string | null>(null)
 
@@ -114,6 +120,7 @@ export function TicTacToeControllerPage() {
     if (gs?.status !== 'lobby') return
     const required = gs?.requiredPlayerCount ?? 2
     if (instance.players.length < required) return
+    setStartError('')
     setStarting(true)
     try {
       const res = await fetchApi(`/api/games/instances/${gameInstanceId}/start`, {
@@ -126,8 +133,8 @@ export function TicTacToeControllerPage() {
       }
       const updated = await res.json()
       setInstance(updated)
-    } catch {
-      // could show error
+    } catch (err) {
+      setStartError(err instanceof Error ? err.message : 'Failed to start')
     } finally {
       setStarting(false)
     }
@@ -156,7 +163,7 @@ export function TicTacToeControllerPage() {
     }
   }
 
-  const viewportClass = 'h-dvh max-h-dvh w-full overflow-hidden flex flex-col bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
+  const viewportClass = PHONE_SCREEN_CLASS
 
   if (loading && !instance) {
     return (
@@ -182,75 +189,130 @@ export function TicTacToeControllerPage() {
 
   const instanceStatus = (instance.gameState as { status?: string } | null)?.status
 
-  // ——— Lobby: name, color, and (if first player) Start ———
+  // ——— Lobby: name, color, roster, and (admin = first player) Start ———
   if (instanceStatus === 'lobby') {
     const gs = instance.gameState as { requiredPlayerCount?: number } | null
     const requiredPlayerCount = gs?.requiredPlayerCount ?? 2
-    const canStart = instance.players.length >= requiredPlayerCount && playerOrder === 0
-    const usedColors = new Set(instance.players.map((p) => p.color).filter(Boolean))
+    const isAdmin = playerOrder === 0
+    const lobbyFull = instance.players.length >= requiredPlayerCount
+    const admin = instance.players.find((p) => p.playerOrder === 0)
+    const usedColors = new Set(
+      instance.players.filter((p) => p.playerOrder !== playerOrder).map((p) => p.color).filter(Boolean)
+    )
+    const missing = requiredPlayerCount - instance.players.length
 
     return (
-      <div className={`${viewportClass} p-3 [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:p-4`}>
-        <div className="flex flex-col min-h-0 flex-1 [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:min-w-0">
-          {/* Info block: left (landscape) or top (portrait) */}
-          <div className="flex flex-col justify-center min-h-0 shrink-0 [@media(orientation:landscape)]:w-1/2 [@media(orientation:landscape)]:pr-4 [@media(orientation:landscape)]:justify-center">
-            <h1 className="text-lg font-bold text-white mb-2 [@media(orientation:landscape)]:text-base">
-              {instance.game.name}
-            </h1>
-            <div className="space-y-2 mb-3 [@media(orientation:landscape)]:mb-4">
-              <label className="block text-xs font-medium text-slate-300">Name</label>
+      <div className={viewportClass}>
+        <div className="flex-1 min-h-0 w-full max-w-sm mx-auto px-5 py-4 flex flex-col justify-center gap-5 [@media(orientation:landscape)]:max-w-2xl [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:items-center [@media(orientation:landscape)]:gap-8">
+          {/* You: name + color */}
+          <div className="flex flex-col gap-4 [@media(orientation:landscape)]:flex-1">
+            <div className="text-center [@media(orientation:landscape)]:text-left">
+              <h1 className="text-2xl font-extrabold text-white tracking-tight">{instance.game.name}</h1>
+              {isAdmin && (
+                <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold">
+                  ★ You&apos;re the game admin
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="player-name" className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Your name
+              </label>
               <input
+                id="player-name"
                 type="text"
                 value={pendingName}
+                maxLength={50}
+                autoComplete="off"
+                enterKeyHint="done"
                 onChange={(e) => setPendingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                }}
                 onBlur={() => {
                   const t = pendingName.trim().slice(0, 50)
                   if (t && t !== me?.screenName) updatePlayer({ screenName: t })
                 }}
-                aria-label="Name"
-                className="w-full max-w-xs px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white text-base select-text focus:outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
-            <div className="space-y-2 mb-3 [@media(orientation:landscape)]:mb-4">
-              <span className="block text-xs font-medium text-slate-300">Color</span>
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Your color</span>
+              <div className="flex justify-between gap-2">
                 {PLAYER_COLORS.map((c) => {
-                  const taken = usedColors.has(c) && instance.players.find((p) => p.playerOrder === playerOrder)?.color !== c
+                  const taken = usedColors.has(c)
+                  const selected = pendingColor === c
                   return (
                     <button
                       key={c}
                       type="button"
                       disabled={taken}
+                      aria-label={c}
+                      aria-pressed={selected}
                       onClick={() => {
                         setPendingColor(c)
                         updatePlayer({ color: c })
                       }}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${COLOR_CLASSES[c] ?? 'bg-gray-500'} ${
-                        pendingColor === c ? 'border-white ring-2 ring-white/50' : 'border-transparent'
-                      } ${taken ? 'opacity-40 cursor-not-allowed' : 'hover:scale-110'}`}
-                      title={c}
+                      className={`w-11 h-11 rounded-full border-4 transition-transform ${COLOR_CLASSES[c] ?? 'bg-gray-500'} ${
+                        selected ? 'border-white scale-110 shadow-lg' : 'border-transparent'
+                      } ${taken ? 'opacity-25 cursor-default' : 'cursor-pointer active:scale-95'}`}
                     />
                   )
                 })}
               </div>
             </div>
-            {canStart && (
+          </div>
+
+          {/* Table: roster + start */}
+          <div className="flex flex-col gap-3 [@media(orientation:landscape)]:flex-1">
+            <div className="rounded-2xl bg-white/5 border border-white/10 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Players</span>
+                <span className="text-xs font-semibold text-slate-300">
+                  {instance.players.length}/{requiredPlayerCount}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {Array.from({ length: requiredPlayerCount }, (_, seat) => {
+                  const p = instance.players.find((pl) => pl.playerOrder === seat)
+                  return (
+                    <li key={seat} className="flex items-center gap-2 text-sm">
+                      <span
+                        className={`w-4 h-4 rounded-full shrink-0 ${
+                          p?.color ? COLOR_CLASSES[p.color] : 'border-2 border-dashed border-white/25'
+                        }`}
+                      />
+                      {p ? (
+                        <span className="text-white truncate">
+                          {p.screenName}
+                          {p.playerOrder === playerOrder && <span className="text-slate-400"> (you)</span>}
+                          {p.playerOrder === 0 && <span className="text-amber-300"> ★</span>}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic">Waiting to join…</span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+            {isAdmin && lobbyFull ? (
               <button
                 type="button"
                 onClick={handleStart}
                 disabled={starting}
-                className="mt-2 w-full max-w-xs py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold disabled:opacity-50 text-sm"
+                className="w-full py-4 rounded-2xl bg-amber-500 text-slate-900 text-lg font-extrabold shadow-lg shadow-amber-500/30 cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-default"
               >
-                {starting ? 'Starting…' : 'Start game'}
+                {starting ? 'Starting…' : 'Start Game'}
               </button>
+            ) : (
+              <p className="text-center text-sm text-slate-400">
+                {!lobbyFull
+                  ? `Waiting for ${missing} more player${missing === 1 ? '' : 's'}…`
+                  : `Waiting for ${admin?.screenName ?? 'the admin'} to start…`}
+              </p>
             )}
-            {playerOrder !== 0 && (
-              <p className="text-xs text-slate-500 mt-2">Waiting for first player to start…</p>
-            )}
-          </div>
-          {/* Spacer / board area in lobby is just the join code or placeholder in landscape */}
-          <div className="hidden [@media(orientation:landscape)]:flex [@media(orientation:landscape)]:w-1/2 [@media(orientation:landscape)]:items-center [@media(orientation:landscape)]:justify-center">
-            <p className="text-slate-500 text-sm">Game will begin when host or first player starts.</p>
+            {startError && <p className="text-center text-sm text-red-400">{startError}</p>}
           </div>
         </div>
       </div>
@@ -281,7 +343,7 @@ export function TicTacToeControllerPage() {
 
   return (
     <div
-      className={`${viewportClass} p-3 flex flex-col [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:p-4`}
+      className={`${viewportClass} p-3 [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:p-4`}
     >
       <div className="flex flex-col min-h-0 flex-1 [@media(orientation:landscape)]:flex-row [@media(orientation:landscape)]:min-w-0 [@media(orientation:landscape)]:items-center [@media(orientation:landscape)]:gap-4">
         {/* Info: top (portrait) or left (landscape) */}
@@ -306,7 +368,7 @@ export function TicTacToeControllerPage() {
         </div>
         {/* Board: fills remaining space, no scroll */}
         <div className="flex-1 min-h-0 flex items-center justify-center [@media(orientation:landscape)]:w-1/2 [@media(orientation:landscape)]:min-w-0 py-2">
-          <div className="w-full max-w-[min(100%,theme(maxWidth.sm))] aspect-square grid grid-cols-3 gap-1 sm:gap-2">
+          <div className="w-[min(92vw,24rem,calc(100dvh-11rem))] [@media(orientation:landscape)]:w-[min(46vw,calc(100dvh-2rem))] aspect-square grid grid-cols-3 gap-1 sm:gap-2">
             {board.map((row, r) =>
               row.map((cell, c) => (
                 <button
@@ -314,7 +376,7 @@ export function TicTacToeControllerPage() {
                   type="button"
                   disabled={cell !== '' || !isMyTurn || makingMove}
                   onClick={() => handleMove(r, c)}
-                  className="aspect-square rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-4xl min-[400px]:text-5xl sm:text-6xl font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/20 transition-colors active:scale-95"
+                  className="aspect-square rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-4xl min-[400px]:text-5xl sm:text-6xl font-bold disabled:opacity-50 disabled:cursor-default cursor-pointer hover:bg-white/20 transition-colors active:scale-95"
                 >
                   <span className={cell ? cellColorClass(cell) : 'text-white'}>{cell || ''}</span>
                 </button>
