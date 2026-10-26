@@ -30,7 +30,7 @@ const BANK_PITCH = MARKET_W / 6
 /** Top of the bank chips' base; the stacks and their counts rise above it. */
 export const BANK_Y = H - BANK_CHIP - 24
 
-/** How big each player's pieces are, by how many players share the table. */
+/** How big each player's pieces are (the same for every seat, whatever the player count). */
 interface Profile {
   mini: number
   tableauCap: number
@@ -39,27 +39,26 @@ interface Profile {
   name: number
   disc: number
 }
-const PROFILE_TALL: Profile = { mini: 78, tableauCap: 600, tok: 64, noble: 80, name: 30, disc: 62 }
-const PROFILE_CORNER: Profile = { mini: 68, tableauCap: 220, tok: 56, noble: 62, name: 25, disc: 52 }
+// The nobles a player earns sit beside their place card, so the tableau gets the rest of the height.
+const PROFILE: Profile = { mini: 68, tableauCap: 300, tok: 56, noble: 62, name: 25, disc: 52 }
 /** Gap between a player's colour columns (their token stacks sit directly above them). */
 const COL_GAP = 8
 
 export type Zone = { x: number; y: number; w: number; h: number; profile: Profile }
 /**
- * Open-table zones in front of each seat: 2 players face each other across the market;
- * 3 players take two corners and one long side; 4 players take the four corners. Each zone
- * spans the whole strip between the screen edge and the market, so centring a player's pieces
- * in it leaves equal table on both sides of them.
+ * Every seat gets a corner of the table, sized and laid out as in a 4-player game whatever the
+ * player count. Seats go clockwise around the table as seen on screen (bottom-left → top-left →
+ * top-right → bottom-right), so turn order reads naturally; 2 and 3 players simply leave the
+ * later corners empty. Each zone spans the strip between the screen edge and the market, so
+ * centring a player's pieces in it leaves equal table on both sides of them.
  */
 export function zonesFor(n: number): Zone[] {
-  const L = 0
   const R = MARKET_X + MARKET_W
-  const side = MARKET_X
-  const tall = (x: number): Zone => ({ x, y: 20, w: side, h: H - 40, profile: PROFILE_TALL })
-  const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: side, h: H / 2 - 20, profile: PROFILE_CORNER })
-  if (n <= 2) return [tall(L), tall(R)]
-  if (n === 3) return [corner(L, false), corner(L, true), tall(R)]
-  return [corner(L, false), corner(L, true), corner(R, true), corner(R, false)]
+  const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: MARKET_X, h: H / 2 - 20, profile: PROFILE })
+  const corners = [corner(0, false), corner(0, true), corner(R, true), corner(R, false)]
+  // Clockwise seat order (bottom-left → top-left → top-right → bottom-right). Two players sit in
+  // opposite corners so the table isn't lopsided.
+  return n === 2 ? [corners[0], corners[2]] : corners.slice(0, n)
 }
 
 /** Gap between a player's reserved backs in their pile (fraction of a mini card's height). */
@@ -74,15 +73,15 @@ export function spotLayout(zone: Zone) {
   const pr = zone.profile
   const slotsW = pr.mini * 6 + COL_GAP * 5
   const left = zone.x + (zone.w - slotsW) / 2
-  // Vertical flow: place card → token stacks (counts rise above them) → tableau / reserved pile → nobles.
-  const placeH = pr.disc + 6
+  // Vertical flow: place card (with earned nobles beside it) → token stacks (counts rise above
+  // them) → tableau / reserved pile.
+  const placeH = Math.max(pr.disc, pr.noble) + 6
   const tokHead = pr.tok * 0.07 * 6 + pr.tok * TOKEN_COUNT_SCALE * 1.3
-  const contentH = placeH + 16 + tokHead + pr.tok + 12 + pr.tableauCap + 22 + pr.noble
+  const contentH = placeH + 16 + tokHead + pr.tok + 12 + pr.tableauCap
   const top = zone.y + Math.max(0, (zone.h - contentH) / 2)
   const tokY = top + placeH + 16 + tokHead
   const tableauY = tokY + pr.tok + 12
-  const lowY = tableauY + pr.tableauCap + 22
-  return { pr, slotsW, left, top, contentH, tokY, tableauY, lowY, slotX: (i: number) => left + i * (pr.mini + COL_GAP) }
+  return { pr, slotsW, left, top, placeH, contentH, tokY, tableauY, slotX: (i: number) => left + i * (pr.mini + COL_GAP) }
 }
 
 /** A seat's light pool covers about a quarter of the table, centred on where its pieces gather. */
@@ -92,31 +91,8 @@ export function glowRect(zone: Zone) {
   return { x: left - 60, y: top - 50, w: slotsW + 120, h: h + 60 }
 }
 
-function hexRgb(hex: string): [number, number, number] {
-  const n = parseInt(hex.slice(1), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-}
-function luminance([r, g, b]: [number, number, number]) {
-  const lin = (c: number) => {
-    const v = c / 255
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
-}
-/** Light the pool adds to the table (screen-blended), so every seat colour reads about equally. */
-const GLOW_TARGET = 0.3
-/**
- * Seat colours differ a lot in brightness (green and yellow glow; blue, red and purple barely
- * show on dark wood). Lift dark hues toward white a little, then scale each pool's strength by
- * its luminance so all of them add roughly the same light.
- */
-export function glowTone(hex: string) {
-  const rgb = hexRgb(hex)
-  const lift = Math.min(0.3, Math.max(0, (0.45 - luminance(rgb)) * 0.8))
-  const lit = rgb.map((c) => Math.round(c + (255 - c) * lift)) as [number, number, number]
-  const alpha = Math.min(0.95, Math.max(0.35, GLOW_TARGET / luminance(lit)))
-  return { rgb: lit, alpha, added: luminance(lit) * alpha }
-}
+/** One warm candlelight for whoever's turn it is: seat colours read too differently on the wood. */
+export const TURN_LIGHT = { rgb: [255, 196, 112] as const, alpha: 0.5 }
 
 function useStageScale() {
   const [scale, setScale] = useState(1)
@@ -236,7 +212,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
 
         {/* Each player's light pool sits under their pieces */}
         {view.players.map((p, i) => (
-          <TurnGlow key={`glow-${p.seat}`} rect={glowRect(zones[i])} hex={seatHex(p.color)} on={!view.finished && glowTurn === p.seat} />
+          <TurnGlow key={`glow-${p.seat}`} rect={glowRect(zones[i])} on={!view.finished && glowTurn === p.seat} />
         ))}
 
         {/* Nobles */}
@@ -354,8 +330,8 @@ function FinalRoundSeal() {
   )
 }
 
-function TurnGlow({ rect, hex, on }: { rect: { x: number; y: number; w: number; h: number }; hex: string; on: boolean }) {
-  const { rgb, alpha } = glowTone(hex)
+function TurnGlow({ rect, on }: { rect: { x: number; y: number; w: number; h: number }; on: boolean }) {
+  const { rgb, alpha } = TURN_LIGHT
   const c = (a: number) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`
   return (
     <div
@@ -408,7 +384,7 @@ function Loose({
 }
 
 function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; first: boolean; pending: 'discard' | 'noble' | null }) {
-  const { pr, slotsW, left, top, tokY, tableauY, lowY, slotX } = spotLayout(zone)
+  const { pr, slotsW, left, top, placeH, tokY, tableauY, slotX } = spotLayout(zone)
   const miniH = pr.mini * CARD_RATIO
   const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
   const tallest = Math.max(1, ...columns.map((c) => c.cards.length))
@@ -421,7 +397,7 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
 
   return (
     <>
-      <PlaceCard p={p} x={left} y={top} pr={pr} first={first} pending={pending} maxW={slotsW} />
+      <PlaceCard p={p} x={left} y={top} h={placeH - 6} pr={pr} first={first} pending={pending} maxW={slotsW} />
 
       {/* Token stacks, each over its own colour column (an empty colour leaves bare table but keeps its spot for flights) */}
       {TOKENS.map((t, i) => (
@@ -482,30 +458,27 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
         </Loose>
       ))}
 
-      {/* Nobles won */}
-      {p.nobles.map((id, i) => (
-        <Loose
-          key={id}
-          anchor={`p${p.seat}-noble-${id}`}
-          seed={`p${p.seat}-noble-${id}`}
-          w={pr.noble}
-          h={pr.noble}
-          deg={4}
-          px={3}
-          style={{ left: left + i * (pr.noble * 0.8), top: lowY }}
-        >
-          <NobleTile id={id} size={pr.noble} />
-        </Loose>
-      ))}
     </>
   )
 }
 
-/** A parchment tent card with the player's name, beside a wooden score disc. */
+/** Earned nobles beside the place card never take more than this share of the seat's width. */
+const NOBLE_ROW_SHARE = 0.42
+
+/** Width of a seat's earned-noble row; tiles overlap a little once there are several. */
+export function nobleRow(count: number, pr: Profile, maxW: number) {
+  if (count === 0) return { step: 0, width: 0 }
+  const budget = maxW * NOBLE_ROW_SHARE
+  const step = count > 1 ? Math.min(pr.noble + 6, (budget - pr.noble) / (count - 1)) : 0
+  return { step, width: pr.noble + step * (count - 1) }
+}
+
+/** A parchment tent card with the player's name, beside a wooden score disc; earned nobles lie to its right. */
 function PlaceCard({
   p,
   x,
   y,
+  h,
   pr,
   first,
   pending,
@@ -514,6 +487,8 @@ function PlaceCard({
   p: PublicPlayer
   x: number
   y: number
+  /** Height of the place-card row (the taller of the score disc and a noble tile). */
+  h: number
   pr: Profile
   first: boolean
   pending: 'discard' | 'noble' | null
@@ -522,8 +497,10 @@ function PlaceCard({
 }) {
   const hex = seatHex(p.color)
   const j = jitter(`place-${p.seat}`, 2, 2)
+  const coinW = first ? pr.disc * 0.55 + 10 : 0
+  const nobles = nobleRow(p.nobles.length, pr, maxW)
   return (
-    <div style={{ position: 'absolute', left: x + j.dx, top: y + j.dy, display: 'flex', alignItems: 'center', gap: 10, transform: `rotate(${j.rot}deg)` }}>
+    <div style={{ position: 'absolute', left: x + j.dx, top: y + j.dy, height: h, display: 'flex', alignItems: 'center', gap: 10, transform: `rotate(${j.rot}deg)` }}>
       <div
         style={{
           position: 'relative',
@@ -551,7 +528,7 @@ function PlaceCard({
           color: '#3b2412',
           fontSize: pr.name,
           lineHeight: 1.1,
-          maxWidth: maxW - pr.disc - pr.disc * 0.55 - 30,
+          maxWidth: maxW - pr.disc - coinW - (nobles.width ? nobles.width + 14 : 0) - 20,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -584,6 +561,25 @@ function PlaceCard({
           }}
         >
           1
+        </div>
+      )}
+      {/* Nobles won: a small row right of the name (in the row's flow, so it follows the name's width) */}
+      {nobles.width > 0 && (
+        <div style={{ position: 'relative', width: nobles.width, height: pr.noble, marginLeft: 4 }}>
+          {p.nobles.map((id, i) => (
+            <Loose
+              key={id}
+              anchor={`p${p.seat}-noble-${id}`}
+              seed={`p${p.seat}-noble-${id}`}
+              w={pr.noble}
+              h={pr.noble}
+              deg={4}
+              px={2}
+              style={{ left: i * nobles.step, top: 0, zIndex: i }}
+            >
+              <NobleTile id={id} size={pr.noble} />
+            </Loose>
+          ))}
         </div>
       )}
     </div>

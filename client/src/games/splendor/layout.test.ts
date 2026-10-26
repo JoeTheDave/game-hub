@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BANK_CHIP, BANK_Y, BLOCK_W, MARKET_BOTTOM, MARKET_X, glowRect, glowTone, planAnimation, spotLayout, zonesFor } from './TableView'
-import { SEAT_HEX, TOKEN_COUNT_SCALE } from './components'
+import { BANK_CHIP, BANK_Y, BLOCK_W, MARKET_BOTTOM, MARKET_X, TURN_LIGHT, glowRect, nobleRow, planAnimation, spotLayout, zonesFor } from './TableView'
+import { TOKEN_COUNT_SCALE } from './components'
 import type { SplendorTableView } from '@games/splendor/engine'
 
 describe('tabletop layout', () => {
@@ -41,13 +41,49 @@ describe('player zones', () => {
     }
   })
 
-  it("keeps each seat's pieces (tokens, tableau, reserved pile, nobles) inside its zone", () => {
+  it('sizes and lays out every seat as a 4-player corner, whatever the player count', () => {
+    const four = zonesFor(4)
+    for (const n of [2, 3]) {
+      const zones = zonesFor(n)
+      // 2 players sit in opposite corners (bottom-left, top-right); 3 take the first three.
+      const expected = n === 2 ? [four[0], four[2]] : four.slice(0, n)
+      zones.forEach((z, i) => {
+        expect(z).toEqual(expected[i])
+        expect(spotLayout(z)).toMatchObject({ left: spotLayout(expected[i]).left, top: spotLayout(expected[i]).top })
+      })
+    }
+    for (const z of four) {
+      expect(z.w).toBe(four[0].w)
+      expect(z.h).toBe(four[0].h)
+    }
+    // clockwise as seen on screen: bottom-left → top-left → top-right → bottom-right
+    const [bl, tl, tr, br] = four
+    expect(bl.x).toBe(tl.x)
+    expect(bl.y).toBeGreaterThan(tl.y)
+    expect(tr.x).toBeGreaterThan(tl.x)
+    expect(tr.y).toBe(tl.y)
+    expect(br.x).toBe(tr.x)
+    expect(br.y).toBeGreaterThan(tr.y)
+  })
+
+  it('fits earned nobles in a row beside the name card, overlapping once there are several', () => {
+    const { pr, slotsW } = spotLayout(zonesFor(4)[0])
+    expect(nobleRow(0, pr, slotsW).width).toBe(0)
+    expect(nobleRow(1, pr, slotsW).width).toBe(pr.noble)
+    for (const n of [2, 3, 4, 5]) {
+      const row = nobleRow(n, pr, slotsW)
+      expect(row.width).toBeLessThanOrEqual(slotsW * 0.42 + 0.01)
+      expect(row.step).toBeGreaterThan(pr.noble * 0.3)
+    }
+  })
+
+  it("keeps each seat's pieces (place card and nobles, tokens, tableau, reserved pile) inside its zone", () => {
     for (const n of [2, 3, 4]) {
       for (const z of zonesFor(n)) {
-        const { top, contentH, lowY, pr } = spotLayout(z)
+        const { top, contentH, placeH, pr } = spotLayout(z)
         expect(top).toBeGreaterThanOrEqual(z.y)
         expect(top + contentH).toBeLessThanOrEqual(z.y + z.h + 1)
-        expect(lowY + pr.noble).toBeLessThanOrEqual(z.y + z.h + 1)
+        expect(placeH).toBeGreaterThanOrEqual(pr.noble)
         // the reserved pile (three backs, stepped) fits in the tableau's vertical budget
         const miniH = pr.mini * (88 / 63)
         expect(miniH + 2 * miniH * 0.22).toBeLessThanOrEqual(pr.tableauCap)
@@ -67,10 +103,11 @@ describe('player zones', () => {
     }
   })
 
-  it('makes every seat colour add about the same light to the table', () => {
-    const added = Object.values(SEAT_HEX).map((hex) => glowTone(hex).added)
-    const mean = added.reduce((a, b) => a + b, 0) / added.length
-    for (const a of added) expect(Math.abs(a - mean) / mean).toBeLessThan(0.25)
+  it('uses one warm candlelight for every seat', () => {
+    const [r, g, b] = TURN_LIGHT.rgb
+    expect(r).toBeGreaterThan(g)
+    expect(g).toBeGreaterThan(b)
+    expect(TURN_LIGHT.alpha).toBeGreaterThan(0.3)
   })
 })
 
