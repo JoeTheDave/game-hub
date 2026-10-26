@@ -1,11 +1,11 @@
 [
  {
   "name": "gem-white",
-  "prompt": "a brilliant round cut clear white diamond, sparkling facets, crown facing viewer, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "prompt": "classic diamond gemstone icon, brilliant cut diamond viewed from the side and slightly above, crown facets on top and long pointed pavilion below like an inverted cone, tilted to the right, sparkling clear white diamond with dark black facet reflections and bright glints, game board token gem art, hyperrealistic, centered, fills two thirds of the frame, isolated on a flat uniform medium gray background, no shadow, no text",
   "width": 768,
   "height": 768,
-  "seed": 100,
-  "steps": 20
+  "seed": 723,
+  "steps": 24
  },
  {
   "name": "gem-blue",

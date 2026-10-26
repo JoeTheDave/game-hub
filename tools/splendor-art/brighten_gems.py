@@ -25,7 +25,7 @@ RADIUS = 0.475  # farthest opaque pixel from centre, as a fraction of the canvas
 
 # brightness, colour (saturation), contrast, gamma (<1 lifts mid-tones)
 ADJUST = {
-    "white": (1.00, 1.00, 1.06, 1.00),
+    "white": (1.05, 1.00, 1.16, 0.95),
     "blue": (1.50, 1.12, 1.04, 0.75),
     "green": (1.32, 1.15, 1.08, 0.85),
     "red": (1.45, 1.15, 1.08, 0.80),

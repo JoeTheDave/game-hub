@@ -33,7 +33,7 @@ API-format workflows: `tools/splendor-art/workflow-flux-api.json` and `workflow-
 ## Prompts and seeds (`tools/splendor-art/jobs.json`)
 | Asset | Model | Size | Seed | Prompt |
 |---|---|---|---|---|
-| `gem-white` | flux | 768×768 | 100 | a brilliant round cut clear white diamond, sparkling facets, crown facing viewer, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text |
+| `gem-white` | flux | 768×768 | 723 | classic diamond gemstone icon, brilliant cut diamond viewed from the side and slightly above, crown facets on top and long pointed pavilion below like an inverted cone, tilted to the right, sparkling clear white diamond with dark black facet reflections and bright glints, game board token gem art, hyperrealistic, centered, fills two thirds of the frame, isolated on a flat uniform medium gray background, no shadow, no text |
 | `gem-blue` | flux | 768×768 | 101 | a deep royal blue sapphire smooth oval cabochon, polished dome, star-like inner glow, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text |
 | `gem-green` | flux | 768×768 | 151 | a deep green emerald gemstone with a rectangular emerald step cut, wider than tall, clipped corners, vivid saturated green, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text |
 | `gem-red` | flux | 768×768 | 103 | a deep crimson red ruby with cushion cut rounded square shape, faceted, vivid saturated red, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text |
@@ -70,3 +70,11 @@ API-format workflows: `tools/splendor-art/workflow-flux-api.json` and `workflow-
 | `table` | flux | 1024×1024 | 403 | a flat top-down seamless texture of a dark polished walnut wood tabletop, rich brown grain, evenly lit, full frame, no objects, no text |
 
 Retry note: `comfy_gen.py` re-runs a job with `seed + 1000×attempt` when the output is nearly flat. Low-contrast assets like the parchment can trip this check, so the seed in the table is the starting seed.
+
+## Diamond rework (iteration 3)
+The white gem was regenerated as a classic brilliant cut seen from the side, like the real token: Flux, seed 723, 24 steps, prompt in the table above. It was post-processed by hand instead of with `process_assets.py`:
+- rembg (`isnet-general-use`) found the stone, but glass-on-grey made its matte patchy.
+- So the alpha is the **convex hull** of the rembg mask, drawn at 4× and downsampled, which gives a clean, solid silhouette.
+- Then the stone was rotated 18° counter-clockwise so the pavilion points to the lower right, and fitted to 448 px.
+
+The result is `tools/splendor-art/originals/gems/white.webp`. `brighten_gems.py` then adds contrast for darker facets: `white: (1.05, 1.00, 1.16, 0.95)`.

@@ -15,7 +15,7 @@ const H = 1080
 // Central market: big, straight cards so a couch can read them (and flights land exactly).
 // The gem bank lies in a row beneath the market, so the market stays narrow and the open table
 // on either side goes to the players.
-const CARD = 160
+const CARD = 154
 const CARD_H = CARD * CARD_RATIO
 const GAP = 14
 const NOBLE = 112
@@ -29,36 +29,93 @@ export const BANK_CHIP = 78
 const BANK_PITCH = MARKET_W / 6
 /** Top of the bank chips' base; the stacks and their counts rise above it. */
 export const BANK_Y = H - BANK_CHIP - 24
-const SIDE_W = MARKET_X - 16 // open table on each side of the market
 
 /** How big each player's pieces are, by how many players share the table. */
 interface Profile {
   mini: number
   tableauCap: number
   tok: number
-  res: number
   noble: number
   name: number
   disc: number
 }
-const PROFILE_TALL: Profile = { mini: 78, tableauCap: 600, tok: 64, res: 74, noble: 80, name: 30, disc: 62 }
-const PROFILE_CORNER: Profile = { mini: 68, tableauCap: 220, tok: 56, res: 58, noble: 62, name: 25, disc: 52 }
+const PROFILE_TALL: Profile = { mini: 78, tableauCap: 600, tok: 64, noble: 80, name: 30, disc: 62 }
+const PROFILE_CORNER: Profile = { mini: 68, tableauCap: 220, tok: 56, noble: 62, name: 25, disc: 52 }
 /** Gap between a player's colour columns (their token stacks sit directly above them). */
 const COL_GAP = 8
 
-type Zone = { x: number; y: number; w: number; h: number; profile: Profile }
+export type Zone = { x: number; y: number; w: number; h: number; profile: Profile }
 /**
  * Open-table zones in front of each seat: 2 players face each other across the market;
- * 3 players take two corners and one long side; 4 players take the four corners.
+ * 3 players take two corners and one long side; 4 players take the four corners. Each zone
+ * spans the whole strip between the screen edge and the market, so centring a player's pieces
+ * in it leaves equal table on both sides of them.
  */
 export function zonesFor(n: number): Zone[] {
-  const L = 14
-  const R = W - SIDE_W - 14
-  const tall = (x: number): Zone => ({ x, y: 20, w: SIDE_W, h: H - 40, profile: PROFILE_TALL })
-  const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: SIDE_W, h: H / 2 - 20, profile: PROFILE_CORNER })
+  const L = 0
+  const R = MARKET_X + MARKET_W
+  const side = MARKET_X
+  const tall = (x: number): Zone => ({ x, y: 20, w: side, h: H - 40, profile: PROFILE_TALL })
+  const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: side, h: H / 2 - 20, profile: PROFILE_CORNER })
   if (n <= 2) return [tall(L), tall(R)]
   if (n === 3) return [corner(L, false), corner(L, true), tall(R)]
   return [corner(L, false), corner(L, true), corner(R, true), corner(R, false)]
+}
+
+/** Gap between a player's reserved backs in their pile (fraction of a mini card's height). */
+const RES_STEP = 0.22
+
+/**
+ * Where a seat's pieces go inside its zone: six slots across (five colour columns plus gold,
+ * with the reserved pile under gold), centred horizontally so the table on either side matches,
+ * and the whole stack centred vertically.
+ */
+export function spotLayout(zone: Zone) {
+  const pr = zone.profile
+  const slotsW = pr.mini * 6 + COL_GAP * 5
+  const left = zone.x + (zone.w - slotsW) / 2
+  // Vertical flow: place card → token stacks (counts rise above them) → tableau / reserved pile → nobles.
+  const placeH = pr.disc + 6
+  const tokHead = pr.tok * 0.07 * 6 + pr.tok * TOKEN_COUNT_SCALE * 1.3
+  const contentH = placeH + 16 + tokHead + pr.tok + 12 + pr.tableauCap + 22 + pr.noble
+  const top = zone.y + Math.max(0, (zone.h - contentH) / 2)
+  const tokY = top + placeH + 16 + tokHead
+  const tableauY = tokY + pr.tok + 12
+  const lowY = tableauY + pr.tableauCap + 22
+  return { pr, slotsW, left, top, contentH, tokY, tableauY, lowY, slotX: (i: number) => left + i * (pr.mini + COL_GAP) }
+}
+
+/** A seat's light pool covers about a quarter of the table, centred on where its pieces gather. */
+export function glowRect(zone: Zone) {
+  const { left, top, slotsW } = spotLayout(zone)
+  const h = Math.min(zone.h, H / 2 - 20)
+  return { x: left - 60, y: top - 50, w: slotsW + 120, h: h + 60 }
+}
+
+function hexRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function luminance([r, g, b]: [number, number, number]) {
+  const lin = (c: number) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+}
+/** Light the pool adds to the table (screen-blended), so every seat colour reads about equally. */
+const GLOW_TARGET = 0.3
+/**
+ * Seat colours differ a lot in brightness (green and yellow glow; blue, red and purple barely
+ * show on dark wood). Lift dark hues toward white a little, then scale each pool's strength by
+ * its luminance so all of them add roughly the same light.
+ */
+export function glowTone(hex: string) {
+  const rgb = hexRgb(hex)
+  const lift = Math.min(0.3, Math.max(0, (0.45 - luminance(rgb)) * 0.8))
+  const lit = rgb.map((c) => Math.round(c + (255 - c) * lift)) as [number, number, number]
+  const alpha = Math.min(0.95, Math.max(0.35, GLOW_TARGET / luminance(lit)))
+  return { rgb: lit, alpha, added: luminance(lit) * alpha }
 }
 
 function useStageScale() {
@@ -179,7 +236,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
 
         {/* Each player's light pool sits under their pieces */}
         {view.players.map((p, i) => (
-          <TurnGlow key={`glow-${p.seat}`} zone={zones[i]} hex={seatHex(p.color)} on={!view.finished && glowTurn === p.seat} />
+          <TurnGlow key={`glow-${p.seat}`} rect={glowRect(zones[i])} hex={seatHex(p.color)} on={!view.finished && glowTurn === p.seat} />
         ))}
 
         {/* Nobles */}
@@ -297,16 +354,19 @@ function FinalRoundSeal() {
   )
 }
 
-function TurnGlow({ zone, hex, on }: { zone: Zone; hex: string; on: boolean }) {
+function TurnGlow({ rect, hex, on }: { rect: { x: number; y: number; w: number; h: number }; hex: string; on: boolean }) {
+  const { rgb, alpha } = glowTone(hex)
+  const c = (a: number) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a.toFixed(3)})`
   return (
     <div
       style={{
         position: 'absolute',
-        left: zone.x - 40,
-        top: zone.y - 30,
-        width: zone.w + 80,
-        height: zone.h + 60,
-        background: `radial-gradient(ellipse 60% 55% at 50% 50%, ${hex}55 0%, ${hex}22 45%, rgba(0,0,0,0) 75%)`,
+        left: rect.x,
+        top: rect.y,
+        width: rect.w,
+        height: rect.h,
+        background: `radial-gradient(ellipse 50% 50% at 50% 50%, ${c(alpha)} 0%, ${c(alpha * 0.55)} 40%, ${c(alpha * 0.18)} 70%, rgba(0,0,0,0) 100%)`,
+        mixBlendMode: 'screen',
         opacity: on ? 1 : 0,
         transition: 'opacity 700ms ease',
         pointerEvents: 'none',
@@ -348,7 +408,7 @@ function Loose({
 }
 
 function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; first: boolean; pending: 'discard' | 'noble' | null }) {
-  const pr = zone.profile
+  const { pr, slotsW, left, top, tokY, tableauY, lowY, slotX } = spotLayout(zone)
   const miniH = pr.mini * CARD_RATIO
   const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
   const tallest = Math.max(1, ...columns.map((c) => c.cards.length))
@@ -356,24 +416,12 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
   const tableauH = Math.min(pr.tableauCap, miniH + (tallest - 1) * peek)
 
   // Six slots across: five colour columns plus gold. Each colour's token stack sits directly
-  // above that colour's cards; gold (which has no cards) takes the sixth slot.
-  const slotsW = pr.mini * 6 + COL_GAP * 5
-  const left = zone.x + Math.max(0, (zone.w - slotsW) / 2)
-  const slotX = (i: number) => left + i * (pr.mini + COL_GAP)
-
-  // Vertical flow: place card → token stacks (counts rise above them) → tableau → reserved + nobles.
-  const placeH = pr.disc + 6
-  const tokHead = pr.tok * 0.07 * 6 + pr.tok * TOKEN_COUNT_SCALE * 1.3
-  const contentH = placeH + 16 + tokHead + pr.tok + 12 + pr.tableauCap + 22 + pr.res * CARD_RATIO
-  const top = zone.y + Math.max(0, (zone.h - contentH) / 2)
-  const tokY = top + placeH + 16 + tokHead
-  const tableauY = tokY + pr.tok + 12
-  const lowY = tableauY + pr.tableauCap + 22
-  const resStep = pr.res * 0.62
+  // above that colour's cards; gold (which has no cards) takes the sixth slot, and the
+  // reserved pile lies under it.
 
   return (
     <>
-      <PlaceCard p={p} x={left} y={top} pr={pr} first={first} pending={pending} />
+      <PlaceCard p={p} x={left} y={top} pr={pr} first={first} pending={pending} maxW={slotsW} />
 
       {/* Token stacks, each over its own colour column (an empty colour leaves bare table but keeps its spot for flights) */}
       {TOKENS.map((t, i) => (
@@ -417,20 +465,20 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
         )
       })}
 
-      {/* Reserved cards: always face-down, fanned a little */}
+      {/* Reserved cards: a small face-down pile in the sixth column, under the gold */}
       {[0, 1, 2].map((i) => (
         <Loose
           key={`res-${i}`}
           anchor={`p${p.seat}-res-${i}`}
           seed={`p${p.seat}-res-${i}`}
-          w={pr.res}
-          h={pr.res * CARD_RATIO}
-          deg={3}
+          w={pr.mini}
+          h={miniH}
+          deg={2.5}
           px={2}
-          tilt={(i - 1) * 5}
-          style={{ left: left + i * resStep, top: lowY }}
+          tilt={(i - 1) * 3}
+          style={{ left: slotX(5), top: tableauY + i * miniH * RES_STEP }}
         >
-          {p.reserved[i] ? <CardBack tier={p.reserved[i].tier} size={pr.res} /> : null}
+          {p.reserved[i] ? <CardBack tier={p.reserved[i].tier} size={pr.mini} /> : null}
         </Loose>
       ))}
 
@@ -444,7 +492,7 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
           h={pr.noble}
           deg={4}
           px={3}
-          style={{ left: left + pr.res + 2 * resStep + 28 + i * (pr.noble * 0.7), top: lowY + 4 }}
+          style={{ left: left + i * (pr.noble * 0.8), top: lowY }}
         >
           <NobleTile id={id} size={pr.noble} />
         </Loose>
@@ -454,7 +502,24 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
 }
 
 /** A parchment tent card with the player's name, beside a wooden score disc. */
-function PlaceCard({ p, x, y, pr, first, pending }: { p: PublicPlayer; x: number; y: number; pr: Profile; first: boolean; pending: 'discard' | 'noble' | null }) {
+function PlaceCard({
+  p,
+  x,
+  y,
+  pr,
+  first,
+  pending,
+  maxW,
+}: {
+  p: PublicPlayer
+  x: number
+  y: number
+  pr: Profile
+  first: boolean
+  pending: 'discard' | 'noble' | null
+  /** The width of the seat's pieces; the place card never reaches past them toward the market. */
+  maxW: number
+}) {
   const hex = seatHex(p.color)
   const j = jitter(`place-${p.seat}`, 2, 2)
   return (
@@ -486,7 +551,7 @@ function PlaceCard({ p, x, y, pr, first, pending }: { p: PublicPlayer; x: number
           color: '#3b2412',
           fontSize: pr.name,
           lineHeight: 1.1,
-          maxWidth: SIDE_W - pr.disc - 70,
+          maxWidth: maxW - pr.disc - pr.disc * 0.55 - 30,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',

@@ -273,8 +273,8 @@ export function Token({ gem, size, style }: { gem: Token; size: number; style?: 
         draggable={false}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.1, filter: 'blur(2px)' }}
       />
-      {/* inner disc is 8.9em across; gem images are normalised to a 95% circle, so 8.4em ≈ 90% fill */}
-      <GemImg gem={gem} size="8.4em" style={{ position: 'relative' }} />
+      {/* inner disc is 8.9em across; gem images are normalised to a 95% circle, so 7.56em ≈ 81% fill */}
+      <GemImg gem={gem} size="7.56em" style={{ position: 'relative' }} />
     </div>
   )
 }
