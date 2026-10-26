@@ -1,0 +1,113 @@
+import { describe, expect, it } from 'vitest'
+import { CAPACITY, SPACES } from '@games/dragonheart/data'
+import { flightBox, type Rect } from './flyers'
+import {
+  BOARD,
+  H,
+  W,
+  ZONE_W,
+  belowShipRect,
+  boardDragonRect,
+  deckRect,
+  glowRect,
+  handRect,
+  scoreRect,
+  seatDragonRect,
+  shipStackRect,
+  slotRect,
+  spotLayout,
+  zoneFor,
+} from './layout'
+
+const inside = (r: Rect, box: { x: number; y: number; w: number; h: number }, slack = 0) =>
+  r.x >= box.x - slack && r.y >= box.y - slack && r.x + r.w <= box.x + box.w + slack && r.y + r.h <= box.y + box.h + slack
+const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+
+describe('board layout', () => {
+  it('keeps every outline (all staggered slots) and the dragon start on the board, without overlapping other spaces', () => {
+    const rects: { space: string; r: Rect }[] = []
+    for (const s of SPACES) for (let i = 0; i < Math.max(1, CAPACITY[s]); i++) rects.push({ space: s, r: slotRect(s, i) })
+    for (const { r } of rects) expect(inside(r, BOARD)).toBe(true)
+    expect(inside(boardDragonRect(), BOARD)).toBe(true)
+    for (const a of rects) for (const b of rects) if (a.space !== b.space) expect(overlaps(a.r, b.r)).toBe(false)
+    for (const a of rects) expect(overlaps(a.r, boardDragonRect())).toBe(false)
+  })
+
+  it('puts the Knight/Huntress pile under the Ship and the ship stacks beside it, between the player zones', () => {
+    const b = belowShipRect()
+    const ship = slotRect('ship', 0)
+    expect(b.y).toBeGreaterThan(BOARD.y + BOARD.h)
+    expect(Math.abs(b.x + b.w / 2 - (ship.x + ship.w / 2))).toBeLessThan(80)
+    for (const r of [b, shipStackRect(0), shipStackRect(1), shipStackRect(2)]) {
+      expect(r.x).toBeGreaterThan(ZONE_W)
+      expect(r.x + r.w).toBeLessThan(W - ZONE_W)
+      expect(r.y + r.h).toBeLessThanOrEqual(H)
+    }
+  })
+})
+
+describe('player zones', () => {
+  it('gives both seats identical geometry, mirrored to the bottom corners', () => {
+    const a = spotLayout(zoneFor(0))
+    const b = spotLayout(zoneFor(1))
+    expect(a.contentW).toBe(b.contentW)
+    expect(a.top).toBe(b.top)
+    expect(b.left - a.left).toBe(W - ZONE_W)
+  })
+
+  it('leaves equal table between each seat and the screen edge and between it and the central area (±4px)', () => {
+    for (const seat of [0, 1]) {
+      const z = zoneFor(seat)
+      const s = spotLayout(z)
+      const right = s.left + s.contentW
+      const toEdge = seat === 0 ? s.left : W - right
+      const toCentre = seat === 0 ? ZONE_W - right : s.left - (W - ZONE_W)
+      expect(toEdge).toBeGreaterThan(8)
+      expect(Math.abs(toEdge - toCentre)).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('fits every piece in its zone without overlapping the board or each other', () => {
+    for (const seat of [0, 1]) {
+      const z = zoneFor(seat)
+      const pieces = [deckRect(seat), scoreRect(seat), seatDragonRect(seat), ...Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6))]
+      for (const r of pieces) {
+        expect(inside(r, z, 6)).toBe(true)
+        expect(r.y).toBeGreaterThan(BOARD.y + BOARD.h)
+      }
+      const fan = Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6))
+      const fanBox = { x: Math.min(...fan.map((r) => r.x)), y: fan[0].y, w: Math.max(...fan.map((r) => r.x + r.w)) - Math.min(...fan.map((r) => r.x)), h: fan[0].h }
+      expect(overlaps(deckRect(seat), fanBox)).toBe(false)
+      expect(overlaps(scoreRect(seat), fanBox)).toBe(false)
+      const g = glowRect(seat)
+      expect(g.x).toBeGreaterThanOrEqual(z.x - 60)
+      expect(g.x + g.w).toBeLessThanOrEqual(z.x + z.w + 60)
+    }
+  })
+})
+
+describe('flight geometry', () => {
+  it('flies on a straight path from the source to exactly the destination, never dipping below either', () => {
+    const pairs: [Rect, Rect][] = [
+      [handRect(0, 4, 5), slotRect('dwarf', 3)],
+      [slotRect('treasure'), scoreRect(1)],
+      [slotRect('knight', 1), belowShipRect()],
+      [slotRect('ship', 2), shipStackRect(2)],
+      [deckRect(1), handRect(1, 5, 6)],
+      [boardDragonRect(), seatDragonRect(0)],
+    ]
+    for (const [from, to] of pairs) {
+      const start = flightBox(from, to, 0)
+      const end = flightBox(from, to, 1)
+      expect(start.x).toBeCloseTo(from.x)
+      expect(start.y).toBeCloseTo(from.y)
+      expect(end.x).toBeCloseTo(to.x)
+      expect(end.y).toBeCloseTo(to.y)
+      expect(end.w).toBeCloseTo(to.w)
+      expect(end.h).toBeCloseTo(to.h)
+      const mid = flightBox(from, to, 0.5, 60)
+      const lowest = Math.max(from.y + from.h, to.y + to.h)
+      expect(mid.y + mid.h).toBeLessThanOrEqual(lowest + 1)
+    }
+  })
+})

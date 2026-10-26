@@ -1,0 +1,109 @@
+[
+ {
+  "name": "card-dwarf",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 610,
+  "prompt": "a bearded dwarf miner with a pickaxe crouching in a dark timber-framed mine tunnel, a glowing oil lantern hanging from a beam, warm orange lantern light, deep brown shadows, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-knight",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 611,
+  "prompt": "a young red-haired knight in a brown leather and mail tunic with a red cape raising a sword and holding a round shield, crouching on a grassy hillside, warm golden sunset light, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-huntress",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 612,
+  "prompt": "a blonde huntress archer with a braid and a quiver, in a dark green leather tunic and trousers, kneeling on a rock drawing a longbow aimed upward to the right, violet and peach sunset sky behind her, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-treasure",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 613,
+  "prompt": "an open wooden treasure chest overflowing with gold coins and jewels sitting on top of a tall jagged golden rock spire above the sea, pink and violet sunset sky, distant mountains, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-fireDragon",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 614,
+  "prompt": "a pale golden winged dragon diving through the air over the sea at sunset, wings spread wide, long tail, pink and peach hazy sky, misty mountains far away, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-sorceress",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 615,
+  "prompt": "a dark-haired sorceress in a flowing grey gown riding a rearing brown horse, holding up a tall staff with a glowing blue-white light at its tip, rocky desert ground, violet dusk sky, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "card-petrified",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 726,
+  "prompt": "an enormous petrified dragon turned entirely to grey stone, coiled on a rocky hill, its stone wings folded, the whole dragon is weathered grey granite with cracks and moss, the only color is a glowing blood-red ruby jewel hanging from an iron chain around its stone neck, pale lavender evening sky, fantasy board game card illustration, detailed painterly digital oil painting, muted grey stone, full scene",
+  "negative": "red dragon, green dragon, colorful scales, living dragon, nude, text, letters, watermark, signature, frame, border, deformed, photo"
+ },
+ {
+  "name": "card-ship",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 727,
+  "prompt": "a small medieval wooden cog boat with one single mast and one cream square sail, a single small boat alone, sailing on calm deep violet water, purple and peach evening sky, gentle waves, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene",
+  "negative": "three masts, many masts, galleon, multiple ships, nude, text, letters, watermark, signature, frame, border, deformed, photo"
+ },
+ {
+  "name": "card-troll",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 618,
+  "prompt": "a hulking muscular brown-skinned troll with small tusks sitting hunched holding a huge wooden club, a leather strap across its chest, earthy brown and ochre background, fantasy board game card illustration, detailed painterly digital oil painting, rich warm colors, full scene"
+ },
+ {
+  "name": "board-panorama",
+  "model": "sdxl",
+  "width": 1536,
+  "height": 576,
+  "seed": 720,
+  "prompt": "a wide fantasy landscape panorama painting, the left third is a calm sea at sunset with red and orange clouds and dark rocky sea cliffs with a wooden dock and a small sailing boat, the middle third is a grassy cliff-top dirt road with a distant castle on a hill under a violet sky, the right third is a rocky mountain dragon lair with a huge coiled grey stone dragon statue lying on the ground and one leafy tree at the far right edge, soft hazy warm light, board game board art, detailed painterly digital oil painting, rich warm colors"
+ },
+ {
+  "name": "back-dragon",
+  "model": "sdxl",
+  "width": 832,
+  "height": 1152,
+  "seed": 740,
+  "negative": "frame, border, corner ornaments, panel, text, letters, watermark, signature, color, blurry, photo",
+  "prompt": "a silver metallic serpentine dragon forming a large S shape, one dragon head at the top left and another dragon head at the bottom right of its long scaly coiled body, grey bat wings spread behind its middle, symmetrical heraldic emblem, monochrome silver and grey, highly detailed scales, centered, isolated on a pure flat black background"
+ },
+ {
+  "name": "great-dragon",
+  "model": "flux",
+  "width": 768,
+  "height": 768,
+  "seed": 642,
+  "prompt": "a small glossy deep crimson red plastic dragon miniature figurine, a board game playing piece, the dragon is seated upright on a small round base with its wings folded tightly along its back, long neck, head raised, molded scales, single solid deep red plastic color, studio product photo, three-quarter view, centered, fills two thirds of the frame, isolated on a flat uniform medium gray background, no shadow, no text"
+ },
+ {
+  "name": "table",
+  "model": "flux",
+  "width": 1024,
+  "height": 1024,
+  "seed": 650,
+  "prompt": "a flat top-down seamless texture of a dark weathered oak wood tabletop, deep brown-grey grain with fine cracks, evenly lit, full frame, no objects, no text"
+ }
+]
