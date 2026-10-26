@@ -67,6 +67,7 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **Name and score** sit on a small physical-looking marker (a tent card or score disc), not a header.
 - **Only what's public in the real game is shown.** If the physical game hides something (deck counts, reserved card faces, face-down piles), hide it too: show a back, or a stack whose thickness hints at its size, with no number.
 - **The current turn** is a soft warm light pool under that player's zone: a single uniform golden candlelight colour, *not* the seat colour (seat colours render too unevenly). Bound it to the player's own zone.
+- **Stacks must be readable:** where cards pile up so that only the top shows, add a small physical-looking tag with the card count and total points (when the values were public when played). Never leave players guessing what a pile holds.
 - **Pieces keep their spaces.** When something is taken from a row, leave the gap (`stableSlots`) rather than letting the rest reflow.
 - **Mute and exit controls** are small, low-opacity and at the bottom centre, never over a player's area.
 
@@ -92,7 +93,11 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **Tokens and chips:** a subtle (blurred, low-opacity) background, with the symbol filling about 80% of the chip.
 - **Costs and requirements** show just the coloured shape and a number, with no tiny symbol inside (it reads as clutter).
 - **Typography:** use the **Cinzel** family (Cinzel 800 for numerals with lining and tabular digits, optically centred in their circles or squares; Cinzel Decorative for titles). Never IM Fell English, whose 1 looks Roman.
-- Match the real game's look as closely as possible (Joe's bar), without using the real images.
+- **Match the real game's look as closely as possible (Joe's bar), without shipping the real images.** Dragonheart taught that freshly invented art reads as "cheesy" and loses the board's meaning. The method that works:
+  - **img2img from the scans** with SDXL at low denoise (about 0.30–0.40), plus per-subject passes, so the composition, palette and every painted subject stay faithful while the pixels are newly generated. Clean seams and creases first.
+  - On boards whose spaces have **painted subjects inside their outlines**, those must survive (they tell players what goes where). Keep the printed outlines and arrows in the art, and don't double-draw them in code.
+  - **Measure the space geometry from the scan** (normalised rects in fill order, arrows, special spots) into `boardGeometry.json`, and derive all TV positions from it so cards sit exactly in the painted outlines.
+  - Reserve from-scratch generation for components with no scan (e.g. table textures).
 
 ## 8. Animation and sound
 
