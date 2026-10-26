@@ -157,8 +157,8 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
           </div>
           <div className="flex-1 min-h-0 mx-3 mb-3 rounded-b-xl rounded-tr-xl bg-amber-100/[0.06] border border-white/10 flex flex-col">
             {tab === 'gems' && <GemsTab view={view} canAct={isMyTurn} pending={pending} onTake={act} />}
-            {tab === 'cards' && <CardsTab view={view} highlight={isMyTurn} onCard={setSheet} />}
-            {tab === 'reserved' && <ReservedTab view={view} highlight={isMyTurn} onCard={(id) => setSheet({ kind: 'reserved', id })} />}
+            {tab === 'cards' && <CardsTab view={view} highlight onCard={setSheet} />}
+            {tab === 'reserved' && <ReservedTab view={view} highlight onCard={(id) => setSheet({ kind: 'reserved', id })} />}
           </div>
           {isMyTurn && legal.some((a) => a.type === 'pass') && (
             <div className="shrink-0 px-3 pb-3 -mt-1">

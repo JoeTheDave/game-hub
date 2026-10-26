@@ -52,13 +52,32 @@ export type Zone = { x: number; y: number; w: number; h: number; profile: Profil
  * later corners empty. Each zone spans the strip between the screen edge and the market, so
  * centring a player's pieces in it leaves equal table on both sides of them.
  */
+/**
+ * Keeps each item in the space it was first dealt to: a removed item leaves a null gap rather
+ * than letting the rest slide over. Starts fresh if an unknown item appears (e.g. a new game).
+ */
+export function stableSlots(prev: (string | null)[] | null, current: string[]): (string | null)[] {
+  if (!prev || current.some((id) => !prev.includes(id))) return current.slice()
+  return prev.map((id) => (id && current.includes(id) ? id : null))
+}
+
+function useStableSlots(current: string[]) {
+  const ref = useRef<(string | null)[] | null>(null)
+  const key = current.join(',')
+  return useMemo(() => {
+    ref.current = stableSlots(ref.current, current)
+    return ref.current
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+}
+
 export function zonesFor(n: number): Zone[] {
   const R = MARKET_X + MARKET_W
   const corner = (x: number, top: boolean): Zone => ({ x, y: top ? 14 : H / 2 + 6, w: MARKET_X, h: H / 2 - 20, profile: PROFILE })
   const corners = [corner(0, false), corner(0, true), corner(R, true), corner(R, false)]
-  // Clockwise seat order (bottom-left → top-left → top-right → bottom-right). Two players sit in
-  // opposite corners so the table isn't lopsided.
-  return n === 2 ? [corners[0], corners[2]] : corners.slice(0, n)
+  // Clockwise seat order (bottom-left → top-left → top-right → bottom-right). Two players sit
+  // across the top (top-left, top-right).
+  return n === 2 ? [corners[1], corners[2]] : corners.slice(0, n)
 }
 
 /** Gap between a player's reserved backs in their pile (fraction of a mini card's height). */
@@ -181,6 +200,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
 
   const hideCss = hidden.map((a) => `[data-anchor="${a}"]{visibility:hidden}`).join('')
   const zones = zonesFor(view.players.length)
+  const nobleSlots = useStableSlots(view.nobles)
 
   return (
     <div className="absolute inset-0 overflow-hidden" style={{ background: '#1a120b' }}>
@@ -217,7 +237,9 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
 
         {/* Nobles */}
         <div style={{ position: 'absolute', left: MARKET_X, top: NOBLES_Y, width: MARKET_W, display: 'flex', justifyContent: 'center', gap: 22 }}>
-          {view.nobles.map((id) => {
+          {nobleSlots.map((id, slot) => {
+            // A claimed noble leaves its space empty, so the rest never shift under the flying tile.
+            if (!id) return <div key={`empty-${slot}`} style={{ width: NOBLE, height: NOBLE }} />
             const j = jitter(`noble-${id}`, 2, 3)
             return (
               <div key={id} data-anchor={`noble-${id}`} data-rot={j.rot} style={{ width: NOBLE, height: NOBLE }}>

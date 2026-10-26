@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BANK_CHIP, BANK_Y, BLOCK_W, MARKET_BOTTOM, MARKET_X, TURN_LIGHT, glowRect, nobleRow, planAnimation, spotLayout, zonesFor } from './TableView'
+import { stableSlots, BANK_CHIP, BANK_Y, BLOCK_W, MARKET_BOTTOM, MARKET_X, TURN_LIGHT, glowRect, nobleRow, planAnimation, spotLayout, zonesFor } from './TableView'
 import { TOKEN_COUNT_SCALE } from './components'
 import type { SplendorTableView } from '@games/splendor/engine'
 
@@ -45,8 +45,8 @@ describe('player zones', () => {
     const four = zonesFor(4)
     for (const n of [2, 3]) {
       const zones = zonesFor(n)
-      // 2 players sit in opposite corners (bottom-left, top-right); 3 take the first three.
-      const expected = n === 2 ? [four[0], four[2]] : four.slice(0, n)
+      // 2 players sit across the top (top-left, top-right); 3 take the first three.
+      const expected = n === 2 ? [four[1], four[2]] : four.slice(0, n)
       zones.forEach((z, i) => {
         expect(z).toEqual(expected[i])
         expect(spotLayout(z)).toMatchObject({ left: spotLayout(expected[i]).left, top: spotLayout(expected[i]).top })
@@ -128,5 +128,16 @@ describe('refill flight', () => {
     expect(plan.hidden).toEqual(['slot-1-2'])
     expect(f.duration).toBeGreaterThanOrEqual(500)
     expect(f.duration).toBeLessThanOrEqual(900)
+  })
+})
+
+describe('stableSlots', () => {
+  it('leaves a claimed noble\'s space empty instead of shifting the rest', () => {
+    const first = stableSlots(null, ['n-01', 'n-02', 'n-03'])
+    expect(stableSlots(first, ['n-01', 'n-03'])).toEqual(['n-01', null, 'n-03'])
+  })
+
+  it('starts fresh when an unknown item appears', () => {
+    expect(stableSlots(['n-01', null], ['n-05', 'n-06'])).toEqual(['n-05', 'n-06'])
   })
 })
