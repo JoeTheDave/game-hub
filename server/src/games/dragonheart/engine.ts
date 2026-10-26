@@ -444,8 +444,13 @@ export function previewPlay(s: DragonheartState, seat: Seat, action: Dragonheart
 // ─── views ────────────────────────────────────────────────────────────────────────────────
 
 export interface SpaceView {
-  /** How many cards are there (drives stack thickness only; never shown as a number). */
+  /** How many cards are there (shown on the TV's stack tag, and drives stack thickness). */
   count: number
+  /**
+   * Total points of the cards there. Every card's value is announced when it is played, so this
+   * is a public memory aid (spec 1793038854620, iteration 1) — not a peek at hidden cards.
+   */
+  points: number
   /** Cards that are face-up and visible: all of them on a capacity space, only the top of a stack. */
   visible: CardId[]
 }
@@ -510,7 +515,11 @@ export function summarize(lp: LastPlay, players: SeatInfo[]): string {
 }
 
 function spaceView(cards: CardId[], capacity: number): SpaceView {
-  return { count: cards.length, visible: capacity > 0 ? cards.slice() : cards.length ? [cards[cards.length - 1]] : [] }
+  return {
+    count: cards.length,
+    points: pileValue(cards),
+    visible: capacity > 0 ? cards.slice() : cards.length ? [cards[cards.length - 1]] : [],
+  }
 }
 
 export function tableView(s: DragonheartState, players: SeatInfo[]): DragonheartTableView {

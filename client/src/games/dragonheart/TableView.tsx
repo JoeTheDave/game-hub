@@ -1,13 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { TableViewProps } from '../types'
 import type { DragonheartTableView, PublicPlayer } from '@games/dragonheart/engine'
-import { ARROWS, CAPACITY, SPACES, TO_BELOW_SHIP, type DeckColor, type Space } from '@games/dragonheart/data'
+import { CAPACITY, SPACES, type DeckColor, type Space } from '@games/dragonheart/data'
 import { Card, CardBack, GreatDragon, Outline, StackEdges, deckOf, jitter, seatHex } from './components'
 import { FlipCard, FlyerView, type Flyer, type Rect } from './flyers'
 import {
   BOARD,
-  CARD_H,
-  CARD_W,
   H,
   OFF_CARD,
   P_CARD,
@@ -21,8 +19,10 @@ import {
   handRect,
   scoreRect,
   shipStackRect,
+  outlineRect,
   slotRect,
   spotLayout,
+  tagRect,
   zoneFor,
 } from './layout'
 import { BOARD_IMG, TABLE_IMG } from './assets'
@@ -139,6 +139,9 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         {/* The Knight/Huntress pile, lying below the Ship */}
         <PileBelowShip view={view} />
 
+        {/* Count / points tags pinned at each occupied space */}
+        <StackTags view={view} />
+
         {/* Ship stacks beside it (the third one ends the game) */}
         {view.shipStacks.map((stack, i) => {
           const r = shipStackRect(i)
@@ -178,13 +181,11 @@ function Board({ view }: { view: DragonheartTableView }) {
         height: BOARD.h,
         borderRadius: 14,
         backgroundImage: `url(${BOARD_IMG})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundSize: '100% 100%',
         boxShadow: '0 14px 30px rgba(0,0,0,.6), inset 0 0 0 3px rgba(20,12,6,.55), inset 0 0 60px rgba(0,0,0,.35)',
       }}
     >
-      {/* Outlines and arrows are drawn over the painting, in board-local coordinates */}
-      <BoardMarks />
+      {/* The outlines and arrows are painted into the board art; cards sit inside the measured outlines. */}
       {SPACES.map((space) => (
         <SpaceCards key={space} space={space} view={view} />
       ))}
@@ -200,100 +201,65 @@ function Board({ view }: { view: DragonheartTableView }) {
 /** Board-local copy of a canvas rect (pieces on the board render inside the board element). */
 const local = (r: Rect): Rect => ({ ...r, x: r.x - BOARD.x, y: r.y - BOARD.y })
 
-const center = (r: Rect) => ({ x: r.x + r.w / 2 - BOARD.x, y: r.y + r.h / 2 - BOARD.y })
-
-/** Trim a centre-to-centre line so it starts and ends just outside the two cards. */
-function arrowPath(from: Space, to: Space) {
-  const a = center(slotRect(from, 0))
-  const b = center(slotRect(to, 0))
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const len = Math.hypot(dx, dy)
-  const ux = dx / len
-  const uy = dy / len
-  // distance from a card's centre to its edge along the direction
-  const edge = Math.min(Math.abs(CARD_W / 2 / (ux || 1e-6)), Math.abs(CARD_H / 2 / (uy || 1e-6)))
-  const pad = edge + 14
-  return { x1: a.x + ux * pad, y1: a.y + uy * pad, x2: b.x - ux * pad, y2: b.y - uy * pad }
-}
-
-function BoardMarks() {
-  const ship = slotRect('ship', 0)
-  return (
-    <svg width={BOARD.w} height={BOARD.h} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
-      <defs>
-        <marker id="dh-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M0 0 L10 5 L0 10 z" fill="#f3f4f6" />
-        </marker>
-      </defs>
-      {Object.entries(ARROWS).flatMap(([from, targets]) =>
-        (targets ?? []).map((to) => {
-          const p = arrowPath(from as Space, to)
-          return (
-            <line
-              key={`${from}-${to}`}
-              {...p}
-              stroke="#f3f4f6"
-              strokeOpacity={0.85}
-              strokeWidth={3}
-              markerEnd="url(#dh-arrow)"
-              style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}
-            />
-          )
-        })
-      )}
-      {/* Curved arrows: Knights and Huntresses leave the board for the pile below the Ship */}
-      {TO_BELOW_SHIP.map((space) => {
-        const s = slotRect(space, CAPACITY[space] - 1)
-        const sx = s.x + s.w / 2 - BOARD.x
-        const sy = s.y + s.h + 6 - BOARD.y
-        const ex = ship.x + ship.w / 2 - BOARD.x + (space === 'knight' ? 30 : -30)
-        const ey = BOARD.h - 8
-        return (
-          <path
-            key={space}
-            d={`M${sx} ${sy} Q ${(sx + ex) / 2} ${ey + 4}, ${ex} ${ey}`}
-            stroke="#f3f4f6"
-            strokeOpacity={0.8}
-            strokeWidth={3}
-            fill="none"
-            markerEnd="url(#dh-arrow)"
-            style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,.6))' }}
-          />
-        )
-      })}
-    </svg>
-  )
-}
-
 function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView }) {
   const cap = CAPACITY[space]
   const sv = view.spaces[space]
   if (cap > 0) {
+    // Later cards lie on the next (lower-right) outline, on top, so every card's top-left value shows.
     return (
       <>
-        {Array.from({ length: cap }, (_, i) => (
-          <Outline key={`o${i}`} size={CARD_W} style={{ left: slotRect(space, i).x - BOARD.x, top: slotRect(space, i).y - BOARD.y }} />
-        ))}
-        {sv.visible.map((id, i) => (
-          <div key={id} data-anchor={`slot-${space}-${i}`} style={placed(local(slotRect(space, i)))}>
-            <Card id={id} size={CARD_W} />
-          </div>
-        ))}
+        {sv.visible.map((id, i) => {
+          const r = slotRect(space, i)
+          return (
+            <div key={id} data-anchor={`slot-${space}-${i}`} style={placed(local(r), { zIndex: 2 + i })}>
+              <Card id={id} size={r.w} />
+            </div>
+          )
+        })}
       </>
     )
   }
-  const r = local(slotRect(space, 0))
+  const r = slotRect(space, 0)
   const top = sv.visible[sv.visible.length - 1]
+  if (sv.count === 0) return null
+  return (
+    <div style={placed(local(r), { zIndex: 2 })}>
+      <StackEdges count={sv.count - 1} size={r.w} face="up" />
+      {top && (
+        <div data-anchor={`top-${space}`} style={{ position: 'absolute', inset: 0 }}>
+          <Card id={top} size={r.w} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PileBelowShip({ view }: { view: DragonheartTableView }) {
+  const r = belowShipRect()
+  const o = outlineRect('belowShip')
+  const top = view.belowShip.visible[view.belowShip.visible.length - 1]
   return (
     <>
-      <Outline size={CARD_W} style={{ left: r.x, top: r.y }} />
-      {sv.count > 0 && (
-        <div style={placed(r)}>
-          <StackEdges count={sv.count - 1} size={CARD_W} face="up" />
+      {/* The pile's outline continues off the board onto the table (the board paints only its top). */}
+      <div
+        style={{
+          position: 'absolute',
+          left: o.x,
+          top: o.y,
+          width: o.w,
+          height: o.h,
+          borderRadius: 12,
+          border: '2px solid rgba(229,231,235,.35)',
+          boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.25)',
+          pointerEvents: 'none',
+        }}
+      />
+      {view.belowShip.count > 0 && (
+        <div style={placed(r, { zIndex: 2 })}>
+          <StackEdges count={view.belowShip.count - 1} size={r.w} face="up" />
           {top && (
-            <div data-anchor={`top-${space}`} style={{ position: 'absolute', inset: 0 }}>
-              <Card id={top} size={CARD_W} />
+            <div data-anchor="belowShip" style={{ position: 'absolute', inset: 0 }}>
+              <Card id={top} size={r.w} />
             </div>
           )}
         </div>
@@ -302,23 +268,48 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
   )
 }
 
-function PileBelowShip({ view }: { view: DragonheartTableView }) {
-  const r = belowShipRect()
-  const top = view.belowShip.visible[view.belowShip.visible.length - 1]
+/** Stack spaces and the pile below the Ship show "×n" and their total; capacity spaces their total. */
+export function tagText(space: Space | 'belowShip', count: number, points: number): { count: string | null; points: string } | null {
+  if (count <= 0) return null
+  const stack = space === 'belowShip' || CAPACITY[space] === 0
+  return { count: stack ? `×${count}` : null, points: `${points} ${points === 1 ? 'pt' : 'pts'}` }
+}
+
+function StackTags({ view }: { view: DragonheartTableView }) {
+  const entries: [Space | 'belowShip', { count: number; points: number }][] = [
+    ...SPACES.map((sp) => [sp, view.spaces[sp]] as [Space, { count: number; points: number }]),
+    ['belowShip', view.belowShip],
+  ]
   return (
-    <div style={placed(r)}>
-      <Outline size={OFF_CARD} />
-      {view.belowShip.count > 0 && (
-        <>
-          <StackEdges count={view.belowShip.count - 1} size={OFF_CARD} face="up" />
-          {top && (
-            <div data-anchor="belowShip" style={{ position: 'absolute', inset: 0 }}>
-              <Card id={top} size={OFF_CARD} />
-            </div>
-          )}
-        </>
-      )}
-    </div>
+    <>
+      {entries.map(([space, sv]) => {
+        const t = tagText(space, sv.count, sv.points)
+        if (!t) return null
+        const r = tagRect(space)
+        const j = jitter(`tag-${space}`, 3, 0)
+        return (
+          <div
+            key={space}
+            className="dh-tag"
+            style={{
+              position: 'absolute',
+              left: r.x,
+              top: r.y,
+              width: r.w,
+              height: r.h,
+              zIndex: 20,
+              transform: `rotate(${j.rot}deg)`,
+            }}
+          >
+            <span className="dh-tag-pin" />
+            {t.count && <span className="dh-numeral dh-tag-count">{t.count}</span>}
+            <span className="dh-numeral dh-tag-points" style={{ fontSize: t.count ? 17 : 22 }}>
+              {t.points}
+            </span>
+          </div>
+        )
+      })}
+    </>
   )
 }
 

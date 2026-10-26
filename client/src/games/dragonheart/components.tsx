@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
 import { CARD_BY_ID, KIND_NAMES, type DeckColor, type Kind } from '@games/dragonheart/data'
-import { BACK_DRAGON_IMG, CARD_IMG, FIGURE_IMG } from './assets'
+import { BACK_IMG, CARD_IMG, FIGURE_IMG } from './assets'
 
 /**
  * Composed Dragonheart components. Card art is one generated illustration per kind; the frame,
@@ -11,9 +11,9 @@ import { BACK_DRAGON_IMG, CARD_IMG, FIGURE_IMG } from './assets'
 
 export const CARD_RATIO = 88 / 63
 
-export const DECK_FIELD: Record<DeckColor, { base: string; light: string; eye: string; glow: string }> = {
-  green: { base: '#1f5a2a', light: '#3f8a3c', eye: '#d9f99d', glow: '#4ade80' },
-  red: { base: '#6b1414', light: '#a32020', eye: '#fed7aa', glow: '#f97316' },
+export const DECK_FIELD: Record<DeckColor, { base: string; light: string }> = {
+  green: { base: '#1f5a2a', light: '#3f8a3c' },
+  red: { base: '#6b1414', light: '#a32020' },
 }
 
 export const SEAT_HEX: Record<string, string> = {
@@ -152,9 +152,8 @@ export function Card({ id, size, style }: { id: string; size: number; style?: CS
   )
 }
 
-/** A card back: brushed deck-colour field, the silver serpentine dragon, and its glowing eye. */
+/** A card back: the repainted green or red back art inside the grey border and silver frame. */
 export function CardBack({ deck, size, style }: { deck: DeckColor; size: number; style?: CSSProperties }) {
-  const f = DECK_FIELD[deck]
   return (
     <div
       className="dh-card"
@@ -176,27 +175,15 @@ export function CardBack({ deck, size, style }: { deck: DeckColor; size: number;
           borderRadius: '0.3em',
           border: '0.1em solid #8e9399',
           overflow: 'hidden',
-          background: `repeating-linear-gradient(115deg, rgba(255,255,255,.07) 0 0.08em, rgba(0,0,0,.06) 0.08em 0.22em), radial-gradient(ellipse at 50% 50%, ${f.light}, ${f.base} 75%)`,
+          background: DECK_FIELD[deck].base,
         }}
       >
         <img
-          src={BACK_DRAGON_IMG}
+          src={BACK_IMG[deck]}
           alt=""
           draggable={false}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain' }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
-        {/* the Dragonheart eye: a glowing slit-pupil iris in the deck colour */}
-        <svg viewBox="0 0 40 40" className="dh-eye" style={{ position: 'absolute', left: '50%', top: '50%', width: '2.8em', height: '2.8em', transform: 'translate(-50%,-50%)' }}>
-          <defs>
-            <radialGradient id={`dh-iris-${deck}`} cx="50%" cy="50%" r="50%">
-              <stop offset="0" stopColor={f.eye} />
-              <stop offset="0.55" stopColor={f.glow} />
-              <stop offset="1" stopColor={f.base} stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <ellipse cx="20" cy="20" rx="17" ry="11" fill={`url(#dh-iris-${deck})`} />
-          <ellipse cx="20" cy="20" rx="2.2" ry="9" fill="#120a06" />
-        </svg>
       </div>
     </div>
   )

@@ -1,0 +1,83 @@
+[
+ {
+  "name": "card-dwarf",
+  "input": "/tmp/dh2/cardsrc/dwarf.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a bearded dwarf miner with a pickaxe inside a dark timber-framed mine, a glowing lantern hanging on a beam, warm orange light",
+  "seed": 51,
+  "denoise": 0.4
+ },
+ {
+  "name": "card-knight",
+  "input": "/tmp/dh2/cardsrc/knight.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a red-haired knight in mail and a brown cloak with a sword raised and a round shield, crouching in tall grass, warm light",
+  "seed": 51,
+  "denoise": 0.4
+ },
+ {
+  "name": "card-huntress",
+  "input": "/tmp/dh2/cardsrc/huntress.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a blonde huntress with a braid and a quiver drawing a longbow upward, dark leather clothes, peach and violet dusk sky",
+  "seed": 51,
+  "denoise": 0.4
+ },
+ {
+  "name": "card-treasure",
+  "input": "/tmp/dh2/cardsrc/treasure.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, an open wooden treasure chest full of gold on top of a jagged golden rock spire above the sea, pink and violet sunset sky",
+  "seed": 51,
+  "denoise": 0.4
+ },
+ {
+  "name": "card-fireDragon",
+  "input": "/tmp/dh2/cardsrc/fireDragon.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a pale golden winged dragon flying over a misty sea at sunset, wings spread, hazy pink sky and distant mountains",
+  "seed": 52,
+  "denoise": 0.32
+ },
+ {
+  "name": "card-sorceress",
+  "input": "/tmp/dh2/cardsrc/sorceress.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a dark-haired sorceress in a grey gown riding a rearing brown horse, holding a staff with a glowing white light, violet dusk sky",
+  "seed": 52,
+  "denoise": 0.32
+ },
+ {
+  "name": "card-petrified",
+  "input": "/tmp/dh2/cardsrc/petrified.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a coiled petrified dragon made of weathered grey stone with moss and vines, a red ruby jewel on a chain, lavender sky",
+  "seed": 52,
+  "denoise": 0.32
+ },
+ {
+  "name": "card-ship",
+  "input": "/tmp/dh2/cardsrc/ship.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a single-mast wooden sailing ship with a furled square sail and a small triangular sail on a deep violet sea, rowers, evening sky",
+  "seed": 51,
+  "denoise": 0.4
+ },
+ {
+  "name": "card-troll",
+  "input": "/tmp/dh2/cardsrc/troll.png",
+  "width": 640,
+  "height": 896,
+  "prompt": "detailed fantasy oil painting, board game card illustration in the style of Michael Menzel, rich painterly brushwork, highly detailed, a hulking muscular brown-grey troll sitting hunched and gripping a huge wooden club, a leather strap across its chest, earthy background",
+  "seed": 51,
+  "denoise": 0.4
+ }
+]

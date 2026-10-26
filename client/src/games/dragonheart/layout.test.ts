@@ -8,6 +8,9 @@ import {
   ZONE_W,
   belowShipRect,
   boardDragonRect,
+  boundsOf,
+  outlineRect,
+  tagRect,
   deckRect,
   glowRect,
   handRect,
@@ -23,20 +26,33 @@ const inside = (r: Rect, box: { x: number; y: number; w: number; h: number }, sl
   r.x >= box.x - slack && r.y >= box.y - slack && r.x + r.w <= box.x + box.w + slack && r.y + r.h <= box.y + box.h + slack
 const overlaps = (a: Rect, b: Rect) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
-describe('board layout', () => {
-  it('keeps every outline (all staggered slots) and the dragon start on the board, without overlapping other spaces', () => {
+describe('board layout (measured from the real board)', () => {
+  it('seats every card inside its painted outline, on the board, without overlapping other spaces or the dragon start', () => {
     const rects: { space: string; r: Rect }[] = []
-    for (const s of SPACES) for (let i = 0; i < Math.max(1, CAPACITY[s]); i++) rects.push({ space: s, r: slotRect(s, i) })
+    for (const s of SPACES) for (let i = 0; i < Math.max(1, CAPACITY[s]); i++) rects.push({ space: s, r: boundsOf(slotRect(s, i)) })
     for (const { r } of rects) expect(inside(r, BOARD)).toBe(true)
+    for (const s of SPACES) for (let i = 0; i < Math.max(1, CAPACITY[s]); i++) expect(inside(boundsOf(slotRect(s, i)), outlineRect(s, i), 1)).toBe(true)
     expect(inside(boardDragonRect(), BOARD)).toBe(true)
     for (const a of rects) for (const b of rects) if (a.space !== b.space) expect(overlaps(a.r, b.r)).toBe(false)
     for (const a of rects) expect(overlaps(a.r, boardDragonRect())).toBe(false)
   })
 
+  it('turns cards 90° on the landscape outlines (Petrified Dragon, the pile below the Ship)', () => {
+    for (const r of [slotRect('petrified'), belowShipRect()]) {
+      const b = boundsOf(r)
+      expect(b.w).toBeGreaterThan(b.h)
+    }
+    expect(boundsOf(slotRect('treasure')).h).toBeGreaterThan(boundsOf(slotRect('treasure')).w)
+  })
+
+  it('pins every stack tag inside the canvas', () => {
+    for (const s of [...SPACES, 'belowShip' as const]) expect(inside(tagRect(s), { x: 0, y: 0, w: W, h: H })).toBe(true)
+  })
+
   it('puts the Knight/Huntress pile under the Ship and the ship stacks beside it, between the player zones', () => {
-    const b = belowShipRect()
+    const b = boundsOf(belowShipRect())
     const ship = slotRect('ship', 0)
-    expect(b.y).toBeGreaterThan(BOARD.y + BOARD.h)
+    expect(b.y + b.h / 2).toBeGreaterThan(BOARD.y + BOARD.h)
     expect(Math.abs(b.x + b.w / 2 - (ship.x + ship.w / 2))).toBeLessThan(80)
     for (const r of [b, shipStackRect(0), shipStackRect(1), shipStackRect(2)]) {
       expect(r.x).toBeGreaterThan(ZONE_W)

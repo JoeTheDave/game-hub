@@ -480,6 +480,17 @@ describe('hidden information', () => {
     expect(json).toContain(`"${stack[2]}"`)
   })
 
+  it('the table shows each space’s card count and total points, but still only the top card of a stack', () => {
+    const { s, stack } = midGame()
+    const tv = tableView(s, seats)
+    const fd = tv.spaces.fireDragon
+    expect(fd.count).toBe(3)
+    expect(fd.points).toBe(stack.reduce((a, id) => a + CARD_BY_ID[id].points, 0))
+    expect(fd.visible).toEqual([stack[2]])
+    expect(tv.spaces.treasure).toEqual({ count: 0, points: 0, visible: [] })
+    expect(tv.belowShip.points).toBe(0)
+  })
+
   it('a phone sees its own hand and score pile, never the opponent’s', () => {
     const { s } = midGame()
     const v = playerView(s, 0, seats)

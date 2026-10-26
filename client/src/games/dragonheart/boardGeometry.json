@@ -1,0 +1,298 @@
+{
+ "_doc": "Board geometry measured from the stitched scan of Joe's board, in normalized coordinates of client/src/games/dragonheart/assets/board/panorama.webp (x,w as fractions of width; y,h of height). Board aspect = width/height. 'outlines' are listed in fill order: index 0 is the topmost (upper-left, drawn in front) outline that takes the first card; later outlines step down-right and sit behind. Orientation: portrait outlines are ~0.65 w/h; petrified and belowShip are landscape. belowShip extends past the board's bottom edge (y+h > 1), as on the real board where that pile sits below the board.",
+ "aspect": 2.9756,
+ "spaces": {
+  "fireDragon": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.1444,
+     "y": 0.0331,
+     "w": 0.1006,
+     "h": 0.4586
+    }
+   ]
+  },
+  "treasure": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.3906,
+     "y": 0.0315,
+     "w": 0.1011,
+     "h": 0.4603
+    }
+   ]
+  },
+  "sorceress": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.6167,
+     "y": 0.0281,
+     "w": 0.1017,
+     "h": 0.4603
+    }
+   ]
+  },
+  "petrified": {
+   "orientation": "landscape",
+   "outlines": [
+    {
+     "x": 0.7572,
+     "y": 0.0646,
+     "w": 0.1544,
+     "h": 0.298
+    }
+   ]
+  },
+  "huntress": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.0128,
+     "y": 0.3858,
+     "w": 0.1,
+     "h": 0.4586
+    },
+    {
+     "x": 0.025,
+     "y": 0.4189,
+     "w": 0.1,
+     "h": 0.4586
+    },
+    {
+     "x": 0.0372,
+     "y": 0.452,
+     "w": 0.1,
+     "h": 0.4586
+    }
+   ]
+  },
+  "ship": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.2528,
+     "y": 0.3841,
+     "w": 0.1,
+     "h": 0.4603
+    },
+    {
+     "x": 0.265,
+     "y": 0.4172,
+     "w": 0.1,
+     "h": 0.4603
+    },
+    {
+     "x": 0.2772,
+     "y": 0.4503,
+     "w": 0.1,
+     "h": 0.4603
+    }
+   ]
+  },
+  "knight": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.5017,
+     "y": 0.4619,
+     "w": 0.0983,
+     "h": 0.4603
+    },
+    {
+     "x": 0.5128,
+     "y": 0.495,
+     "w": 0.0983,
+     "h": 0.4603
+    }
+   ]
+  },
+  "troll": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.7306,
+     "y": 0.4619,
+     "w": 0.1,
+     "h": 0.457
+    }
+   ]
+  },
+  "dwarf": {
+   "orientation": "portrait",
+   "outlines": [
+    {
+     "x": 0.8483,
+     "y": 0.394,
+     "w": 0.1,
+     "h": 0.4586
+    },
+    {
+     "x": 0.86,
+     "y": 0.4288,
+     "w": 0.1,
+     "h": 0.4586
+    },
+    {
+     "x": 0.8717,
+     "y": 0.4636,
+     "w": 0.1,
+     "h": 0.4586
+    },
+    {
+     "x": 0.8833,
+     "y": 0.4983,
+     "w": 0.1,
+     "h": 0.4586
+    }
+   ]
+  },
+  "belowShip": {
+   "orientation": "landscape",
+   "outlines": [
+    {
+     "x": 0.265,
+     "y": 0.9487,
+     "w": 0.1544,
+     "h": 0.2997
+    }
+   ]
+  }
+ },
+ "greatDragonStart": {
+  "center": [
+   0.9533,
+   0.3113
+  ],
+  "note": "open ground under the tree, right of Petrified Dragon and above the Dwarf"
+ },
+ "arrows": [
+  {
+   "from": "huntress",
+   "to": "fireDragon",
+   "kind": "straight",
+   "start": [
+    0.1072,
+    0.3642
+   ],
+   "end": [
+    0.1417,
+    0.2781
+   ]
+  },
+  {
+   "from": "fireDragon",
+   "to": "treasure",
+   "kind": "straight",
+   "start": [
+    0.2778,
+    0.149
+   ],
+   "end": [
+    0.3794,
+    0.149
+   ]
+  },
+  {
+   "from": "sorceress",
+   "to": "treasure",
+   "kind": "straight",
+   "start": [
+    0.6072,
+    0.1474
+   ],
+   "end": [
+    0.5017,
+    0.1474
+   ]
+  },
+  {
+   "from": "sorceress",
+   "to": "petrified",
+   "kind": "straight",
+   "start": [
+    0.7222,
+    0.144
+   ],
+   "end": [
+    0.7528,
+    0.144
+   ]
+  },
+  {
+   "from": "knight",
+   "to": "sorceress",
+   "kind": "straight",
+   "start": [
+    0.5833,
+    0.4139
+   ],
+   "end": [
+    0.6072,
+    0.356
+   ]
+  },
+  {
+   "from": "knight",
+   "to": "troll",
+   "kind": "straight",
+   "start": [
+    0.6406,
+    0.6705
+   ],
+   "end": [
+    0.7239,
+    0.6705
+   ]
+  },
+  {
+   "from": "troll",
+   "to": "sorceress",
+   "kind": "straight",
+   "start": [
+    0.75,
+    0.4139
+   ],
+   "end": [
+    0.7222,
+    0.3526
+   ]
+  },
+  {
+   "from": "huntress",
+   "to": "belowShip",
+   "kind": "curved",
+   "start": [
+    0.1761,
+    0.8725
+   ],
+   "control": [
+    0.2222,
+    0.8692
+   ],
+   "end": [
+    0.25,
+    0.9487
+   ]
+  },
+  {
+   "from": "knight",
+   "to": "belowShip",
+   "kind": "curved",
+   "start": [
+    0.4817,
+    0.8725
+   ],
+   "control": [
+    0.4444,
+    0.8775
+   ],
+   "end": [
+    0.4317,
+    0.9487
+   ]
+  }
+ ]
+}

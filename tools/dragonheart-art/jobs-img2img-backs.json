@@ -1,0 +1,20 @@
+[
+ {
+  "name": "back-green",
+  "input": "/tmp/dh2/backsrc_green.png",
+  "width": 576,
+  "height": 984,
+  "prompt": "detailed fantasy illustration, card back design, a silver serpentine double-headed dragon forming an S shape with a dragon head at the top left and another at the bottom right, long spiky scaled body, grey bat wings spread behind, a large glowing green dragon eye with a slit pupil in the centre, green brushed painterly background, symmetric, highly detailed",
+  "seed": 61,
+  "denoise": 0.33
+ },
+ {
+  "name": "back-red",
+  "input": "/tmp/dh2/backsrc_red.png",
+  "width": 576,
+  "height": 984,
+  "prompt": "detailed fantasy illustration, card back design, a silver serpentine double-headed dragon forming an S shape with a dragon head at the top left and another at the bottom right, long spiky scaled body, grey bat wings spread behind, a large glowing red dragon eye with a slit pupil in the centre, red brushed painterly background, symmetric, highly detailed",
+  "seed": 61,
+  "denoise": 0.33
+ }
+]

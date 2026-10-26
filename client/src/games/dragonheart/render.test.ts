@@ -3,7 +3,7 @@ import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { dragonheartModule, tableView, type DragonheartAction, type DragonheartState } from '@games/dragonheart/engine'
 import { seededRng, type SeatInfo } from '@games/types'
-import { TableView, planAnimation, MAX_TURN_MS } from './TableView'
+import { TableView, planAnimation, MAX_TURN_MS, tagText } from './TableView'
 import { PhoneView } from './PhoneView'
 import type { GameInstance } from '../../types/game'
 
@@ -59,6 +59,25 @@ describe('dragonheart views render', () => {
         )
       }
     }
+  })
+})
+
+describe('stack tags', () => {
+  it('shows count and total on stacks and the pile below the Ship, total only on capacity spaces, nothing when empty', () => {
+    expect(tagText('treasure', 3, 7)).toEqual({ count: '×3', points: '7 pts' })
+    expect(tagText('belowShip', 1, 1)).toEqual({ count: '×1', points: '1 pt' })
+    expect(tagText('dwarf', 2, 5)).toEqual({ count: null, points: '5 pts' })
+    expect(tagText('fireDragon', 0, 0)).toBeNull()
+  })
+
+  it('renders a tag on the TV for every occupied space', () => {
+    const snaps = play(7)
+    const mid = snaps[1]
+    const tv = tableView(mid, seats)
+    const html = renderToString(createElement(TableView, { instance, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound }))
+    const occupied = Object.values(tv.spaces).filter((sv) => sv.count > 0).length + (tv.belowShip.count > 0 ? 1 : 0)
+    expect(occupied).toBeGreaterThan(0)
+    expect((html.match(/class="dh-tag"/g) ?? []).length).toBe(occupied)
   })
 })
 
