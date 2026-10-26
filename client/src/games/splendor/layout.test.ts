@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { BLOCK_W, MARKET_X, planAnimation, zonesFor } from './TableView'
+import { BANK_CHIP, BANK_Y, BLOCK_W, MARKET_BOTTOM, MARKET_X, planAnimation, zonesFor } from './TableView'
+import { TOKEN_COUNT_SCALE } from './components'
 import type { SplendorTableView } from '@games/splendor/engine'
 
 describe('tabletop layout', () => {
+  it('lays the bank row beneath the market, with room for the tallest stack and its count', () => {
+    const tallestStackTop = BANK_Y - BANK_CHIP * 0.07 * 7 - BANK_CHIP * TOKEN_COUNT_SCALE * 1.3
+    expect(tallestStackTop).toBeGreaterThan(MARKET_BOTTOM)
+    expect(BANK_Y + BANK_CHIP).toBeLessThanOrEqual(1080)
+  })
+
   it('gives every seat an open-table zone on the canvas that never overlaps the market', () => {
     for (const n of [2, 3, 4]) {
       const zones = zonesFor(n)

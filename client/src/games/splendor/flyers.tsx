@@ -26,7 +26,7 @@ export interface Flyer {
   node: ReactNode
   delay: number
   duration: number
-  /** Rotate 180° around Y in flight (node must be a two-faced .spl-flip element). */
+  /** Rotate 180° around Y in flight (node must be a <FlipCard>). */
   flip?: boolean
   /** Lift height in px at mid-flight (an arc reads as "picked up"). */
   lift?: number
@@ -35,9 +35,40 @@ export interface Flyer {
 /** Gentle ease-out: quick to leave, soft to land. */
 export const FLY_EASING = 'cubic-bezier(.22,.8,.3,1)'
 
-function place(r: Rect, to: Rect, lift = 0) {
+/**
+ * The flyer's on-screen box at progress `t` (0 = source, 0.5 = mid-flight peak, 1 = destination):
+ * a straight-line interpolation, raised by `lift` at mid-flight. Pure, so the path is testable.
+ */
+export function flightBox(from: Rect, to: Rect, t: 0 | 0.5 | 1, lift = 0): Rect {
+  const k = t
+  const w = from.w + (to.w - from.w) * k
+  return {
+    x: from.x + (to.x - from.x) * k,
+    y: from.y + (to.y - from.y) * k - (t === 0.5 ? lift : 0),
+    w,
+    // The flyer is drawn at the destination size and scaled uniformly, so its height follows w.
+    h: w * (to.h / to.w),
+  }
+}
+
+function place(r: Rect, to: Rect) {
   const s = r.w / to.w
-  return `translate(${r.x}px, ${r.y - lift}px) scale(${s})`
+  return `translate(${r.x}px, ${r.y}px) scale(${s})`
+}
+
+/**
+ * A two-faced card for flights: `first` shows at 0°, `second` at 180°. Each face sits in its own
+ * absolutely-positioned box, because Card/CardBack set an inline `position: relative`. That used
+ * to override a `.spl-flip > *` rule, so the faces stacked in normal flow and the second face
+ * flew one card-height BELOW its slot (and earlier, beside it).
+ */
+export function FlipCard({ first, second, w, h }: { first: ReactNode; second: ReactNode; w: number; h: number }) {
+  return (
+    <div className="spl-flip" style={{ width: w, height: h }}>
+      <div className="spl-face">{first}</div>
+      <div className="spl-face spl-face-back">{second}</div>
+    </div>
+  )
 }
 
 function turn(flipDeg: number, z: number) {
@@ -64,13 +95,12 @@ export function FlyerView({ flyer, reduced }: { flyer: Flyer; reduced: boolean }
         b.cancel()
       }
     }
-    const mid: Rect = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2, w: (from.w + to.w) / 2, h: (from.h + to.h) / 2 }
     const opts: KeyframeAnimationOptions = { duration, delay, easing: FLY_EASING, fill: 'both' }
     const a = o.animate(
       [
-        { transform: place(from, to), offset: 0 },
-        { transform: place(mid, to, lift), offset: 0.5 },
-        { transform: place(to, to), offset: 1 },
+        { transform: place(flightBox(from, to, 0), to), offset: 0 },
+        { transform: place(flightBox(from, to, 0.5, lift), to), offset: 0.5 },
+        { transform: place(flightBox(from, to, 1), to), offset: 1 },
       ],
       opts
     )

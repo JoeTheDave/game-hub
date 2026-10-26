@@ -3,8 +3,8 @@ import type { TableViewProps } from '../types'
 import type { PublicPlayer, SplendorTableView } from '@games/splendor/engine'
 import { GEMS, TOKENS, type Tier, type Token as TokenKind } from '@games/splendor/data'
 import { CARD_BY_ID } from '@games/splendor/data'
-import { CARD_RATIO, Card, CardBack, NobleTile, TABLEAU_PEEK, Token, TokenPile, jitter, seatHex } from './components'
-import { FlyerView, type Flyer, type Rect } from './flyers'
+import { CARD_RATIO, Card, CardBack, NobleTile, TABLEAU_PEEK, TOKEN_COUNT_SCALE, Token, TokenPile, jitter, seatHex } from './components'
+import { FlipCard, FlyerView, type Flyer, type Rect } from './flyers'
 import { TABLE_IMG } from './assets'
 import './splendor.css'
 
@@ -13,18 +13,22 @@ const W = 1920
 const H = 1080
 
 // Central market: big, straight cards so a couch can read them (and flights land exactly).
-const CARD = 184
+// The gem bank lies in a row beneath the market, so the market stays narrow and the open table
+// on either side goes to the players.
+const CARD = 160
 const CARD_H = CARD * CARD_RATIO
-const GAP = 16
-const NOBLE = 128
-const BANK_CHIP = 76
-const BANK_PITCH = 134
+const GAP = 14
+const NOBLE = 112
 const MARKET_W = CARD * 5 + GAP * 4
-export const BLOCK_W = MARKET_W + 28 + 100 // market + gap + bank column
+export const BLOCK_W = MARKET_W
 export const MARKET_X = (W - BLOCK_W) / 2
-const NOBLES_Y = 22
-const TIERS_Y = NOBLES_Y + NOBLE + 22
-const BANK_X = MARKET_X + MARKET_W + 40
+const NOBLES_Y = 18
+const TIERS_Y = NOBLES_Y + NOBLE + 18
+export const MARKET_BOTTOM = TIERS_Y + 3 * CARD_H + 2 * GAP
+export const BANK_CHIP = 78
+const BANK_PITCH = MARKET_W / 6
+/** Top of the bank chips' base; the stacks and their counts rise above it. */
+export const BANK_Y = H - BANK_CHIP - 24
 const SIDE_W = MARKET_X - 16 // open table on each side of the market
 
 /** How big each player's pieces are, by how many players share the table. */
@@ -37,8 +41,10 @@ interface Profile {
   name: number
   disc: number
 }
-const PROFILE_TALL: Profile = { mini: 70, tableauCap: 430, tok: 52, res: 72, noble: 78, name: 30, disc: 62 }
-const PROFILE_CORNER: Profile = { mini: 62, tableauCap: 205, tok: 44, res: 56, noble: 60, name: 25, disc: 52 }
+const PROFILE_TALL: Profile = { mini: 78, tableauCap: 600, tok: 64, res: 74, noble: 80, name: 30, disc: 62 }
+const PROFILE_CORNER: Profile = { mini: 68, tableauCap: 220, tok: 56, res: 58, noble: 62, name: 25, disc: 52 }
+/** Gap between a player's colour columns (their token stacks sit directly above them). */
+const COL_GAP = 8
 
 type Zone = { x: number; y: number; w: number; h: number; profile: Profile }
 /**
@@ -204,9 +210,13 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
           </div>
         ))}
 
-        {/* Bank: real chip stacks beside the market */}
+        {/* Bank: a row of real chip stacks beneath the market */}
         {TOKENS.map((t, i) => (
-          <div key={t} data-anchor={`bank-${t}`} style={{ position: 'absolute', left: BANK_X, top: TIERS_Y + 40 + i * BANK_PITCH, width: BANK_CHIP, height: BANK_CHIP }}>
+          <div
+            key={t}
+            data-anchor={`bank-${t}`}
+            style={{ position: 'absolute', left: MARKET_X + i * BANK_PITCH + (BANK_PITCH - BANK_CHIP) / 2, top: BANK_Y, width: BANK_CHIP, height: BANK_CHIP }}
+          >
             <TokenPile gem={t} count={view.bank[t]} size={BANK_CHIP} />
           </div>
         ))}
@@ -263,8 +273,8 @@ function FinalRoundSeal() {
       className="spl-pop spl-serif"
       style={{
         position: 'absolute',
-        left: MARKET_X - 30,
-        top: NOBLES_Y + 18,
+        left: MARKET_X + MARKET_W - 104,
+        top: NOBLES_Y + 4,
         width: 104,
         height: 104,
         borderRadius: '50%',
@@ -340,26 +350,46 @@ function Loose({
 function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; first: boolean; pending: 'discard' | 'noble' | null }) {
   const pr = zone.profile
   const miniH = pr.mini * CARD_RATIO
-  const colGap = Math.floor((zone.w - pr.mini * 5) / 4)
   const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
   const tallest = Math.max(1, ...columns.map((c) => c.cards.length))
   const peek = Math.min(miniH * TABLEAU_PEEK, tallest > 1 ? (pr.tableauCap - miniH) / (tallest - 1) : miniH)
   const tableauH = Math.min(pr.tableauCap, miniH + (tallest - 1) * peek)
 
-  // Vertical flow: place card → tableau → tokens → reserved + nobles. Tall zones centre it.
+  // Six slots across: five colour columns plus gold. Each colour's token stack sits directly
+  // above that colour's cards; gold (which has no cards) takes the sixth slot.
+  const slotsW = pr.mini * 6 + COL_GAP * 5
+  const left = zone.x + Math.max(0, (zone.w - slotsW) / 2)
+  const slotX = (i: number) => left + i * (pr.mini + COL_GAP)
+
+  // Vertical flow: place card → token stacks (counts rise above them) → tableau → reserved + nobles.
   const placeH = pr.disc + 6
-  const tokRise = pr.tok * 0.07 * 6
-  const contentH = placeH + 18 + pr.tableauCap + 26 + tokRise + pr.tok + 26 + pr.res * CARD_RATIO
+  const tokHead = pr.tok * 0.07 * 6 + pr.tok * TOKEN_COUNT_SCALE * 1.3
+  const contentH = placeH + 16 + tokHead + pr.tok + 12 + pr.tableauCap + 22 + pr.res * CARD_RATIO
   const top = zone.y + Math.max(0, (zone.h - contentH) / 2)
-  const tableauY = top + placeH + 18
-  const tokY = tableauY + pr.tableauCap + 26 + tokRise
-  const lowY = tokY + pr.tok + 26
-  const tokGap = Math.floor((zone.w - pr.tok * 6) / 5)
+  const tokY = top + placeH + 16 + tokHead
+  const tableauY = tokY + pr.tok + 12
+  const lowY = tableauY + pr.tableauCap + 22
   const resStep = pr.res * 0.62
 
   return (
     <>
-      <PlaceCard p={p} x={zone.x} y={top} pr={pr} first={first} pending={pending} />
+      <PlaceCard p={p} x={left} y={top} pr={pr} first={first} pending={pending} />
+
+      {/* Token stacks, each over its own colour column (an empty colour leaves bare table but keeps its spot for flights) */}
+      {TOKENS.map((t, i) => (
+        <Loose
+          key={t}
+          anchor={`p${p.seat}-tok-${t}`}
+          seed={`p${p.seat}-tok-${t}`}
+          w={pr.tok}
+          h={pr.tok}
+          deg={0}
+          px={3}
+          style={{ left: slotX(i) + (pr.mini - pr.tok) / 2, top: tokY }}
+        >
+          <TokenPile gem={t} count={p.tokens[t]} size={pr.tok} ghost={false} />
+        </Loose>
+      ))}
 
       {/* Tableau: one column per colour; covered cards show only their top band */}
       {columns.map(({ gem, cards }, ci) => {
@@ -370,7 +400,7 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
             data-anchor={`p${p.seat}-col-${gem}`}
             style={{
               position: 'absolute',
-              left: zone.x + ci * (pr.mini + colGap) + j.dx,
+              left: slotX(ci) + j.dx,
               top: tableauY + j.dy,
               width: pr.mini,
               height: cards.length ? tableauH : miniH,
@@ -387,13 +417,6 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
         )
       })}
 
-      {/* Token stacks (an empty colour leaves bare table, but keeps its spot for flights) */}
-      {TOKENS.map((t, i) => (
-        <Loose key={t} anchor={`p${p.seat}-tok-${t}`} seed={`p${p.seat}-tok-${t}`} w={pr.tok} h={pr.tok} deg={0} px={5} style={{ left: zone.x + i * (pr.tok + tokGap), top: tokY }}>
-          <TokenPile gem={t} count={p.tokens[t]} size={pr.tok} ghost={false} />
-        </Loose>
-      ))}
-
       {/* Reserved cards: always face-down, fanned a little */}
       {[0, 1, 2].map((i) => (
         <Loose
@@ -405,7 +428,7 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
           deg={3}
           px={2}
           tilt={(i - 1) * 5}
-          style={{ left: zone.x + i * resStep, top: lowY }}
+          style={{ left: left + i * resStep, top: lowY }}
         >
           {p.reserved[i] ? <CardBack tier={p.reserved[i].tier} size={pr.res} /> : null}
         </Loose>
@@ -421,7 +444,7 @@ function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; 
           h={pr.noble}
           deg={4}
           px={3}
-          style={{ left: zone.x + pr.res + 2 * resStep + 28 + i * (pr.noble * 0.7), top: lowY + 4 }}
+          style={{ left: left + pr.res + 2 * resStep + 28 + i * (pr.noble * 0.7), top: lowY + 4 }}
         >
           <NobleTile id={id} size={pr.noble} />
         </Loose>
@@ -619,10 +642,7 @@ export function planAnimation(
             from: a,
             to: b,
             node: fromReserve ? (
-              <div className="spl-flip" style={{ width: b.w, height: b.h }}>
-                <CardBack tier={CARD_BY_ID[cardId].tier} size={b.w} />
-                <Card id={cardId} size={b.w} />
-              </div>
+              <FlipCard w={b.w} h={b.h} first={<CardBack tier={CARD_BY_ID[cardId].tier} size={b.w} />} second={<Card id={cardId} size={b.w} />} />
             ) : (
               <Card id={cardId} size={b.w} />
             ),
@@ -656,10 +676,7 @@ export function planAnimation(
                 from: a,
                 to: b,
                 node: (
-                  <div className="spl-flip" style={{ width: b.w, height: b.h }}>
-                    <Card id={prevId} size={b.w} />
-                    <CardBack tier={tier} size={b.w} />
-                  </div>
+                  <FlipCard w={b.w} h={b.h} first={<Card id={prevId} size={b.w} />} second={<CardBack tier={tier} size={b.w} />} />
                 ),
                 delay: t,
                 duration: CARD_FLY,
@@ -699,10 +716,7 @@ export function planAnimation(
             from: a,
             to: b,
             node: (
-              <div className="spl-flip" style={{ width: b.w, height: b.h }}>
-                <CardBack tier={tier} size={b.w} />
-                <Card id={e.cardId as string} size={b.w} />
-              </div>
+              <FlipCard w={b.w} h={b.h} first={<CardBack tier={tier} size={b.w} />} second={<Card id={e.cardId as string} size={b.w} />} />
             ),
             delay: at,
             duration: REFILL_FLY,

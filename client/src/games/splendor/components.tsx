@@ -53,7 +53,7 @@ export function GemImg({ gem, size, style }: { gem: Token; size: number | string
 /** Ordered cost entries, matching the real cards (white, blue, green, red, black). */
 export const costEntries = (cost: GemCounts) => GEMS.filter((g) => (cost[g] ?? 0) > 0).map((g) => [g, cost[g]!] as const)
 
-/** A cost pip: coloured circle, white italic numeral, tiny gem glyph. */
+/** A cost pip: coloured circle with its number (no gem glyph; the colour says which gem). */
 function CostPip({ gem, n }: { gem: Gem; n: number }) {
   return (
     <div style={{ position: 'relative', width: '2.2em', height: '2.2em' }}>
@@ -70,11 +70,10 @@ function CostPip({ gem, n }: { gem: Gem; n: number }) {
           boxShadow: '0 0.08em 0.2em rgba(0,0,0,.5)',
         }}
       >
-        <span className="spl-numeral" style={{ fontSize: '1.5em', color: gem === 'white' ? '#f8fafc' : '#fff' }}>
+        <span className="spl-numeral" style={{ fontSize: '1.35em' }}>
           {n}
         </span>
       </div>
-      <GemImg gem={gem} size="1.05em" style={{ position: 'absolute', right: '-0.55em', bottom: '0.05em' }} />
     </div>
   )
 }
@@ -153,7 +152,18 @@ export function CardBack({ tier, size, style, children }: { tier: Tier; size: nu
         src={BACK_IMG}
         alt=""
         draggable={false}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', mixBlendMode: 'multiply', opacity: 0.85 }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          mixBlendMode: 'multiply',
+          opacity: 0.85,
+          // Soften only the engraving (the title stays crisp); the slight scale hides the blur's soft edge.
+          filter: `blur(${Math.max(0.6, size * 0.009)}px)`,
+          transform: 'scale(1.06)',
+        }}
       />
       <div style={{ position: 'absolute', inset: 0, background: TIER_TINT[tier], mixBlendMode: 'color', opacity: 0.9 }} />
       <div
@@ -226,10 +236,9 @@ export function NobleTile({ id, size, style }: { id: string; size: number; style
               boxShadow: '0 0.06em 0.15em rgba(0,0,0,.45)',
             }}
           >
-            <span className="spl-numeral" style={{ fontSize: '1.4em' }}>
+            <span className="spl-numeral" style={{ fontSize: '1.3em' }}>
               {n}
             </span>
-            <GemImg gem={g} size="0.95em" style={{ position: 'absolute', right: '-0.4em', bottom: '-0.1em' }} />
           </div>
         ))}
       </div>
@@ -237,7 +246,7 @@ export function NobleTile({ id, size, style }: { id: string; size: number; style
   )
 }
 
-/** A single gem token: a coloured rim around a soft, subtle disc, with a large gem filling it. */
+/** A single gem token: a coloured rim around a soft, barely-textured disc, with the gem filling it. */
 export function Token({ gem, size, style }: { gem: Token; size: number; style?: CSSProperties }) {
   return (
     <div
@@ -247,9 +256,9 @@ export function Token({ gem, size, style }: { gem: Token; size: number; style?: 
         height: size,
         fontSize: size / 10,
         borderRadius: '50%',
-        border: `0.65em solid ${GEM_COLOR[gem]}`,
+        border: `0.55em solid ${GEM_COLOR[gem]}`,
         boxShadow: `0 0.12em 0.28em rgba(0,0,0,.5), inset 0 0 0 0.1em rgba(0,0,0,.15), 0 0 0 0.06em rgba(0,0,0,.3)`,
-        background: 'radial-gradient(circle at 40% 35%, #f6efe2 0%, #e9dfcc 70%, #d9ccb4 100%)',
+        background: 'radial-gradient(circle at 40% 35%, #f3ede3 0%, #ebe4d8 75%, #e2d9ca 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -262,12 +271,16 @@ export function Token({ gem, size, style }: { gem: Token; size: number; style?: 
         src={PARCHMENT_IMG}
         alt=""
         draggable={false}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.18 }}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.1, filter: 'blur(2px)' }}
       />
-      <GemImg gem={gem} size="7em" style={{ position: 'relative' }} />
+      {/* inner disc is 8.9em across; gem images are normalised to a 95% circle, so 8.4em ≈ 90% fill */}
+      <GemImg gem={gem} size="8.4em" style={{ position: 'relative' }} />
     </div>
   )
 }
+
+/** Count numerals on token stacks, as a fraction of the chip size (big enough to read from the couch). */
+export const TOKEN_COUNT_SCALE = 0.42
 
 /**
  * A physical pile of tokens: chips stacked with a slight natural wobble, height tracking the
@@ -302,7 +315,18 @@ export function TokenPile({
           </div>
         )
       })}
-      {label && count > 0 && <CountBadge n={count} style={{ position: 'absolute', right: -size * 0.22, top: -layers * step - size * 0.02, fontSize: size * 0.26 }} />}
+      {label && count > 0 && (
+        <CountBadge
+          n={count}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: -layers * step - size * TOKEN_COUNT_SCALE * 1.3,
+            transform: 'translateX(-50%)',
+            fontSize: size * TOKEN_COUNT_SCALE,
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -1,16 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=IM+Fell+English:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@600;700;800&display=swap');
 
 .spl-numeral {
-  font-family: 'IM Fell English', Georgia, serif;
-  font-style: italic;
+  /* Same family as the card-back title (Joe's pick); plain Cinzel keeps the digits clean (no
+     Roman-numeral-looking "1"). Lining, tabular figures so every digit sits on one centre line. */
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 800;
+  font-variant-numeric: lining-nums tabular-nums;
   color: #fff;
   line-height: 1;
+  display: inline-block;
+  text-box: trim-both cap alphabetic;
   -webkit-text-stroke: 0.06em #1c1917;
   paint-order: stroke fill;
   text-shadow: 0 0.04em 0.08em rgba(0, 0, 0, 0.45);
 }
 .spl-title {
-  font-family: 'Cinzel Decorative', 'IM Fell English', Georgia, serif;
+  font-family: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
   font-weight: 700;
   background: linear-gradient(180deg, #fde68a 0%, #f59e0b 55%, #b45309 100%);
   -webkit-background-clip: text;
@@ -19,7 +24,16 @@
   filter: drop-shadow(0 0.04em 0.05em rgba(0, 0, 0, 0.7));
 }
 .spl-serif {
-  font-family: 'IM Fell English', Georgia, serif;
+  font-family: 'Cinzel', Georgia, serif;
+  font-weight: 700;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* Where text-box trimming isn't supported, nudge Cinzel's digits down to optical centre
+   (its line box carries more ascent than descent, so digits ride slightly high). */
+@supports not (text-box: trim-both cap alphabetic) {
+  .spl-numeral {
+    transform: translateY(0.06em);
+  }
 }
 .spl-card {
   box-shadow: 0 0.12em 0.35em rgba(0, 0, 0, 0.55), inset 0 0 0 0.05em rgba(255, 255, 255, 0.35);
@@ -39,13 +53,13 @@
   position: relative;
   transform-style: preserve-3d;
 }
-.spl-flip > * {
+.spl-face {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
-.spl-flip > :last-child {
+.spl-face-back {
   transform: rotateY(180deg);
 }
 @keyframes spl-pop {
