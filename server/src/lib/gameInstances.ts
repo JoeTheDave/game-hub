@@ -24,8 +24,23 @@ export type LoadedInstance = Prisma.GameInstanceGetPayload<{ include: typeof ins
 /** Server-side rng for live games (simulation and tests inject a seeded one instead). */
 export const serverRng: Rng = () => randomInt(0, 2 ** 32) / 2 ** 32
 
-export function loadInstance(id: string) {
-  return prisma.gameInstance.findUnique({ where: { id }, include: instanceInclude })
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Load an instance (optionally inside a transaction). A malformed id is simply not found. */
+export async function loadInstance(id: string, db: Prisma.TransactionClient = prisma) {
+  if (!UUID_RE.test(id)) return null
+  return db.gameInstance.findUnique({ where: { id }, include: instanceInclude })
+}
+
+/**
+ * Run `fn` holding a row lock on the instance, so lobby changes (join, start) can't interleave:
+ * a join can never land in a game that a concurrent start already set up without it.
+ */
+export function withInstanceLock<T>(id: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "GameInstance" WHERE id = ${id}::uuid FOR UPDATE`
+    return fn(tx)
+  })
 }
 
 export function storedState(instance: { gameState: Prisma.JsonValue | null }): StoredGameState {

@@ -15,6 +15,7 @@ import {
   seatTokenValid,
   serverRng,
   storedState,
+  withInstanceLock,
   type StoredGameState,
 } from '../lib/gameInstances.js'
 
@@ -132,18 +133,18 @@ router.post('/games/instances/:id/join', async (req: Request, res: Response) => 
     const { id } = req.params
     const { screenName } = req.body as { screenName?: string }
     const trimmed = typeof screenName === 'string' ? screenName.trim() : ''
-    const instance = await loadInstance(id)
-    if (!instance) return res.status(404).json({ error: 'Game not found' })
-    const mod = moduleFor(instance)
-    if (!mod) return res.status(400).json({ error: 'Unknown game type' })
-    if (storedState(instance).phase !== 'lobby') return res.status(400).json({ error: 'Game has already started' })
-    if (instance.players.length >= mod.maxPlayers) return res.status(400).json({ error: 'Game is full' })
-    const playerOrder = instance.players.length
-    const usedColors = new Set(instance.players.map((p) => p.color).filter(Boolean))
     const joinToken = randomBytes(16).toString('hex')
-    let player
-    try {
-      player = await prisma.gameInstancePlayer.create({
+    // Under the instance lock, so a concurrent start can't set up the game without this seat.
+    const outcome = await withInstanceLock(id, async (tx) => {
+      const instance = await loadInstance(id, tx)
+      if (!instance) return { status: 404, error: 'Game not found' } as const
+      const mod = moduleFor(instance)
+      if (!mod) return { status: 400, error: 'Unknown game type' } as const
+      if (storedState(instance).phase !== 'lobby') return { status: 400, error: 'Game has already started' } as const
+      if (instance.players.length >= mod.maxPlayers) return { status: 400, error: 'Game is full' } as const
+      const playerOrder = instance.players.length
+      const usedColors = new Set(instance.players.map((p) => p.color).filter(Boolean))
+      const player = await tx.gameInstancePlayer.create({
         data: {
           gameInstanceId: id,
           userId: sessionUserId(req),
@@ -153,14 +154,11 @@ router.post('/games/instances/:id/join', async (req: Request, res: Response) => 
           playerOrder,
         },
       })
-    } catch (err) {
-      // Two phones raced for the same seat: the loser retries.
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        return res.status(409).json({ error: 'Someone joined at the same moment — try again' })
-      }
-      throw err
-    }
-    await bumpVersion(id)
+      await tx.gameInstance.update({ where: { id }, data: { version: { increment: 1 } } })
+      return { status: 201, player } as const
+    })
+    if (outcome.status !== 201) return res.status(outcome.status).json({ error: outcome.error })
+    const { player } = outcome
     const updated = await loadInstance(id)
     if (updated) broadcastInstance(updated)
     res.status(201).json({
@@ -222,21 +220,28 @@ router.post('/games/instances/:id/start', async (req: Request, res: Response) =>
   try {
     const { id } = req.params
     const { joinToken } = req.body as { joinToken?: string }
-    const instance = await loadInstance(id)
-    if (!instance) return res.status(404).json({ error: 'Game not found' })
-    const mod = moduleFor(instance)
-    if (!mod) return res.status(400).json({ error: 'Unknown game type' })
-    const isHost = sessionUserId(req) === instance.hostUserId
-    if (!isHost && !seatTokenValid(instance, 0, joinToken)) {
-      return res.status(403).json({ error: 'Only the host or the first player can start the game' })
-    }
-    if (storedState(instance).phase !== 'lobby') return res.status(400).json({ error: 'Game already started or finished' })
-    if (instance.players.length < mod.minPlayers) return res.status(400).json({ error: 'Not enough players' })
-    const { state, events } = mod.setup(seatInfos(instance), serverRng)
-    const phase = mod.isFinished(state) ? 'finished' : 'playing'
-    if (!(await versionedWrite(id, instance.version, { phase, state }))) {
-      return res.status(409).json({ error: 'The game changed — try again' })
-    }
+    // Under the instance lock: the seated players read here are exactly the ones set up.
+    const outcome = await withInstanceLock(id, async (tx) => {
+      const instance = await loadInstance(id, tx)
+      if (!instance) return { status: 404, error: 'Game not found' } as const
+      const mod = moduleFor(instance)
+      if (!mod) return { status: 400, error: 'Unknown game type' } as const
+      const isHost = sessionUserId(req) === instance.hostUserId
+      if (!isHost && !seatTokenValid(instance, 0, joinToken)) {
+        return { status: 403, error: 'Only the host or the first player can start the game' } as const
+      }
+      if (storedState(instance).phase !== 'lobby') return { status: 400, error: 'Game already started or finished' } as const
+      if (instance.players.length < mod.minPlayers) return { status: 400, error: 'Not enough players' } as const
+      const { state, events } = mod.setup(seatInfos(instance), serverRng)
+      const phase = mod.isFinished(state) ? 'finished' : 'playing'
+      await tx.gameInstance.update({
+        where: { id },
+        data: { gameState: { phase, state } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
+      })
+      return { status: 200, events } as const
+    })
+    if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error })
+    const { events } = outcome
     const updated = (await loadInstance(id))!
     broadcastInstance(updated, events)
     res.json(lobbySafe(updated))

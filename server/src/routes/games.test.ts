@@ -205,3 +205,31 @@ describe('seat view', () => {
     expect(JSON.stringify(res.body)).not.toContain('joinToken')
   })
 })
+
+describe('lobby races and malformed ids', () => {
+  it('never lets a join land in a game a concurrent start set up without it', async () => {
+    const splendorId = (await prisma.game.findUniqueOrThrow({ where: { slug: 'splendor' } })).id
+    for (let round = 0; round < 10; round++) {
+      const created = await host.post('/api/games/instances').send({ gameId: splendorId })
+      const id = created.body.id as string
+      const a = (await join(id)).body.player
+      await join(id)
+      const [start, late] = await Promise.all([
+        request(app).post(`/api/games/instances/${id}/start`).send({ joinToken: a.joinToken }),
+        join(id),
+      ])
+      expect(start.status).toBe(200)
+      const seated = await prisma.gameInstancePlayer.count({ where: { gameInstanceId: id } })
+      const inst = await prisma.gameInstance.findUniqueOrThrow({ where: { id } })
+      const enginePlayers = ((inst.gameState as { state: { players: unknown[] } }).state.players).length
+      expect(enginePlayers).toBe(seated)
+      // The late joiner either made it in before the start, or was turned away.
+      expect([201, 400]).toContain(late.status)
+    }
+  })
+
+  it('treats a malformed game id as not found', async () => {
+    expect((await request(app).get('/api/games/instances/not-a-uuid')).status).toBe(404)
+    expect((await request(app).post('/api/games/instances/not-a-uuid/join').send({})).status).toBe(404)
+  })
+})

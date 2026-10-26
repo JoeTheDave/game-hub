@@ -76,11 +76,11 @@ game-hub/
 - `POST /games/instances` (auth): creates an instance in phase `lobby`.
 - `GET /games/instances/by-code/:joinCode` and `GET /games/instances/:id`: return the lobby-safe instance, plus `tableView` when playing.
 - `GET /games/instances/:id/me?playerOrder&joinToken`: returns that seat's `playerView`.
-- `POST /games/instances/:id/join` `{ screenName? }`: returns `{ instance, player: { playerOrder, screenName, color, joinToken } }`. This is the only response that carries a token.
+- `POST /games/instances/:id/join` `{ screenName? }` runs under a row lock (`withInstanceLock`), so it can't interleave with a start. Returns `{ instance, player: { playerOrder, screenName, color, joinToken } }`. This is the only response that carries a token.
 - `PATCH /games/instances/:id/players` `{ playerOrder, joinToken, screenName?, color? }`: lobby only.
-- `POST /games/instances/:id/start`: host session or seat 0's `joinToken`, once `players >= minPlayers`. Calls `module.setup`.
+- `POST /games/instances/:id/start`: host session or seat 0's `joinToken`, once `players >= minPlayers`. Calls `module.setup` under the same row lock.
 - `POST /games/instances/:id/action` `{ playerOrder, joinToken, action, version? }`: calls `module.applyAction`, then a versioned write. Returns `{ playerView, version }`, or a 409 with a fresh view on conflict.
-- `GET /api/health`: DB ping. Unknown `/api/*` paths return a JSON 404.
+- `GET /api/health`: DB ping. Unknown `/api/*` paths, and malformed instance ids, return a JSON 404.
 
 **Sockets** (per-viewer rooms):
 - `subscribe-table {id}` joins `game:<id>:table`.
@@ -98,6 +98,42 @@ game-hub/
 | `/join/:joinCode` | JoinGamePage (auto-join, stores seat) | – | phone shell |
 | `/play/:slug/:id` | PlayPage, which renders the shared PhoneLobby, then the game's `PhoneView` | – | phone shell |
 | `/error`, `*` | ErrorPage | – | |
+
+## Games
+### Tic-Tac-Toe (2 players)
+The proof-of-concept game. The TV shows a big 3×3 board with a stamp effect and sound when a mark lands. Each phone shows the board with its own mark and whose turn it is.
+
+### Splendor (2–4 players)
+A full implementation of the base game, built from scans of Joe's physical copy. The scans are reference only and never ship.
+- **Rules** (`server/src/games/splendor/engine.ts`):
+  - 90 development cards and 10 nobles (`data.ts`).
+  - Setup by player count: nobles = players + 1, and 4/5/7 of each gem with 5 gold. The first player is random.
+  - The four actions: take 3 different gems (fewer only when fewer colours remain, and then all of them), take 2 (only from a pile of 4 or more), reserve (from the board or a deck top, max 3, with gold if any is left), and buy (bonuses discount, and payment is automatic: matching gems first, then gold).
+  - After the action: return tokens down to 10, then the noble check (automatic if one qualifies; the player chooses if several do; at most one per turn).
+  - End: after someone reaches 15, the round finishes. Most points wins; ties go to the fewest cards, then a shared win.
+  - `pass` is allowed only when no other action is legal.
+- **Hidden info:** to the TV and other phones, reserved cards are only `{tier}`, whether they came from the board or a deck. Deck order is never sent.
+- **TV** (`client/src/games/splendor/TableView.tsx`):
+  - A fixed 1920×1080 canvas scaled to fit, on a walnut table.
+  - The market is centred: nobles, then tiers 3/2/1, each a deck stack (no count) plus 4 cards. The gem bank sits in a row beneath it.
+  - Every seat uses the same corner zone, assigned clockwise from bottom-left. A 2-player game uses top-left and top-right. Each zone is centred so its gap to the screen edge equals its gap to the market.
+  - In a zone: a name card with a wooden score disc and earned nobles to its right, token stacks above their matching colour columns (gold sixth), face-up tableau columns (only top bands showing), and the reserved pile face-down under gold.
+  - Pieces have a small deterministic jitter. The current turn is a warm golden light pool under that zone.
+  - Nobles keep their dealt space when claimed (`stableSlots`).
+- **Animation and sound:**
+  - Event-driven flights (FLIP via the Web Animations API). The outer layer translates and scales; the inner layer flips around the centre (`FlipCard`, pure `flightBox()`).
+  - Motions run 640–880 ms with gentle easing, and a turn is capped at 2.5 s.
+  - Soft synthesized sounds (−12 dBFS, half gain); the TV needs one tap to unlock audio.
+  - With `prefers-reduced-motion`, motions become fades.
+- **Phone** (`PhoneView.tsx`):
+  - Opens on the Gems tab; the other tabs are Cards and Reserved (n/3).
+  - The card sheet shows the computed payment or shortfall, with Buy/Reserve. "Affordable" marks show even off-turn.
+  - The return-tokens picker and noble choice take over the screen. Haptics on actions.
+- **Art:**
+  - Generated locally (`tools/splendor-art/`: Flux fp8 for the gems and table, SDXL for the 15 scenes, 10 noble portraits and engravings) and composed in code.
+  - Exactly one image per gem. `brighten_gems.py` reprocesses them idempotently from `originals/`.
+  - Numerals use Cinzel; the card-back title uses Cinzel Decorative over a lightly blurred engraving.
+- **Simulation:** `npm run simulate -- splendor --games 2000 --players 2` runs about 2,100 games/sec, deterministic from the seed, for future neural-network training data.
 
 ## Environment Variables
 | Variable | Where Set | Notes |
@@ -126,6 +162,7 @@ game-hub/
   - Exactly one image per gem, reused everywhere.
   - The scans in the vault are reference only and never ship.
   - Regenerate with `tools/splendor-art/` (see `assets/README.md`). ComfyUI on this GPU needs `--disable-smart-memory --fp32-vae`.
+- **Client resync:** every socket room join is acknowledged, and the acknowledgement triggers an HTTP resync, so no update is lost between the first load and the join. Phones treat only 403/404 from `/me` as lasting errors; transient failures (e.g. a 502 during a deploy) retry on the next poll.
 - **Sockets in dev** connect straight to `http://localhost:3001` (Vite only proxies `/api`). In prod they're same-origin.
 - `trust proxy` is set to 1 for Fly, which secure cookies require.
 - **Local Postgres:** `scripts/ensure-postgres.sh` uses the machine's shared `sage-shared-dev-postgres` container (postgres/localdev123). It provides `game_hub_dev` and `game_hub_test` (route tests use the test DB, and `fileParallelism` is off).

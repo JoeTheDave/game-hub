@@ -29,7 +29,7 @@ interface LiveSubscription {
 /**
  * Join a socket room and keep it joined. Phones drop the socket whenever the screen locks or
  * the browser is backgrounded, and the server forgets room membership on disconnect. So this
- * re-subscribes on every (re)connect, and resyncs on reconnect, when the tab becomes visible
+ * re-subscribes on every (re)connect, and resyncs after each room join, when the tab becomes visible
  * again, and on a slow poll while disconnected — no device misses an update.
  *
  * `key` identifies the subscription; it re-runs only when the key changes.
@@ -44,12 +44,11 @@ export function useLiveSubscription(key: string | null, sub: LiveSubscription) {
     if (!socket) return
 
     const resync = () => subRef.current.resync()
-    let hasConnected = socket.connected
+    // Resync once the server confirms the room join, every time, so an update broadcast between
+    // the initial HTTP load and the join is never lost (version guards make duplicates harmless).
     const subscribe = () => {
       const [event, payload] = subRef.current.subscribe
-      socket.emit(event, payload, () => {})
-      if (hasConnected) resync()
-      hasConnected = true
+      socket.emit(event, payload, () => resync())
     }
     const handlerEntries = Object.keys(subRef.current.handlers).map((event) => {
       const fn = (payload: unknown) => subRef.current.handlers[event]?.(payload)
@@ -60,10 +59,7 @@ export function useLiveSubscription(key: string | null, sub: LiveSubscription) {
       if (document.visibilityState === 'visible') resync()
     }
 
-    if (socket.connected) {
-      const [event, payload] = subRef.current.subscribe
-      socket.emit(event, payload, () => {})
-    }
+    if (socket.connected) subscribe()
     socket.on('connect', subscribe)
     document.addEventListener('visibilitychange', onVisible)
     const poll = window.setInterval(() => {

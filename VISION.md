@@ -26,9 +26,10 @@ TBD. Inferred: personal/hobby project, no monetization.
 TBD. Obvious comparison: Jackbox Games (paid, closed catalog). Other comparisons: AirConsole, and browser party-game sites.
 
 ## Roadmap
-TBD: confirm with Joe. Inferred from the code:
 - MVP: platform loop (auth, game catalog, create/lobby/join/start, live sync) proven with tic-tac-toe ✅
-- Next: make the game-plugin framework explicit (a clear contract for a game's server rules plus its table view and phone view), so a new game doesn't mean editing shared routes
+- Game-module framework: each game self-contained (rules engine + TV view + phone view), headless-simulatable ✅ (v1.0.0)
+- Splendor, the first full board game, with a tabletop TV, private phone hands, animation and sound ✅ (v1.0.0)
+- Later: train a neural network on simulated Splendor games (the engine already supports headless simulation)
 - Then: build a shared kit of tabletop components (cards, decks, dice, boards, tokens) that games compose, more games, game-specific creation options, and a real landing page (currently a blank placeholder)
 
 ## Out of Scope (Strategic)

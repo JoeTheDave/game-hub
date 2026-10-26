@@ -35,10 +35,14 @@ export function useSeatFeed(id: string | null, seat: SeatCredentials | null) {
       const qs = new URLSearchParams({ playerOrder: String(seat.playerOrder), joinToken: seat.joinToken })
       const res = await fetchApi(`/api/games/instances/${id}/me?${qs}`)
       if (!res.ok) {
-        setError(res.status === 403 ? 'not-seated' : res.status === 404 ? 'Game not found' : 'Failed to load game')
+        // Only "not your seat" and "no such game" are lasting; anything else (e.g. a 502 during a
+        // deploy) is transient and the next reconnect/visibility/poll retries.
+        if (res.status === 403) setError('not-seated')
+        else if (res.status === 404) setError('Game not found')
         return
       }
       const data = (await res.json()) as { instance: GameInstance; playerView: unknown; version: number }
+      setError(null)
       acceptInstance(data.instance)
       acceptView(data.playerView, data.version)
     } catch {
