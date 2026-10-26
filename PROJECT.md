@@ -148,7 +148,7 @@ A full implementation of the base game, built from scans of Joe's physical copy.
 | `NODE_ENV`, `DATABASE_PROVIDER`, `PRISMA_DISABLE_POSTINSTALL_GENERATION` | fly.toml `[env]` | |
 
 ## Non-Obvious Conventions
-- **Adding a game** (spec 1792780973323):
+- **Adding a game:** follow **`docs/ADDING-A-GAME.md`** (process, engine, TV/phone design rules, art, animation, sound, tests). Mechanics (spec 1792780973323):
   - Server: create `server/src/games/<slug>/` implementing `GameModule` (pure; JSON-only state; rng only via the injected `Rng`; no clock).
   - Client: create `client/src/games/<slug>/` exporting `{ slug, TableView, PhoneView, prepareTable? }`.
   - Add one line to each registry. Nothing else changes, and no migration is needed.

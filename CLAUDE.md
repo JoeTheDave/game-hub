@@ -5,6 +5,7 @@
 - `PROJECT.md`: how it's built, deployed, and what conventions apply
 
 ## Critical conventions for this project
+- **Adding or changing a game? Read `docs/ADDING-A-GAME.md` first and follow it.** It's Joe's standing quality bar (TV as a tabletop, phone as a private hand, generated art, animation and sound, tests). Splendor is the reference implementation.
 - Each game is a self-contained module (`server/src/games/<slug>` pure engine + `client/src/games/<slug>` TableView/PhoneView), wired in only via the two registries. Never put game-specific code in shared routes, pages or sockets, and run `npm test` so every game's suite still passes.
 - Hidden info is enforced server-side: clients only ever receive `tableView` / their own `playerView`, never raw engine state, and never another seat's `joinToken`. Players are anonymous seats authenticated by `joinToken`.
 - Deploys are manual (`npm run deploy` → `fly deploy`, app `sage-game-hub`). The release command runs `prisma migrate deploy` against prod, so a pushed migration goes live on the next deploy.
