@@ -169,4 +169,4 @@ A full implementation of the base game, built from scans of Joe's physical copy.
 - Migration `20250809000000_add_example_users` seeds `alice@example.com`/`bob@example.com` into every environment.
 
 ## Tagged Versions
-None yet.
+- v1.0.0 (2026-10-26): first tagged release. Adds the game-module framework (self-contained games, per-viewer hidden info, joinToken-authenticated actions, headless simulation), moves tic-tac-toe onto it, and adds Splendor for 2–4 players with a tabletop TV, phone hands, generated art, animation and sound. Also fixes the phone lobby UX, sync after reconnects, and the `/api/users` password-hash leak.
