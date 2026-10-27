@@ -52,7 +52,7 @@ router.get('/games', async (_req: Request, res: Response) => {
     res.json(
       games
         .map((g) => ({ g, mod: getGame(g.slug) }))
-        .filter(({ mod }) => mod)
+        .filter(({ mod }) => mod && mod.listed !== false)
         .map(({ g, mod }) => ({ id: g.id, slug: g.slug, name: g.name, minPlayers: mod!.minPlayers, maxPlayers: mod!.maxPlayers }))
     )
   } catch (error) {
@@ -70,7 +70,9 @@ router.post('/games/instances', async (req: Request, res: Response) => {
     const gameId = raw?.gameId != null ? String(raw.gameId) : undefined
     if (!gameId) return res.status(400).json({ error: 'gameId is required' })
     const game = await prisma.game.findUnique({ where: { id: gameId } })
-    if (!game || !getGame(game.slug)) return res.status(404).json({ error: 'Game not found' })
+    const mod = game ? getGame(game.slug) : undefined
+    if (!game || !mod) return res.status(404).json({ error: 'Game not found' })
+    if (mod.listed === false) return res.status(400).json({ error: 'This game is no longer offered' })
     let joinCode = generateJoinCode()
     while (await prisma.gameInstance.findUnique({ where: { joinCode } })) joinCode = generateJoinCode()
     const gameState: StoredGameState = { phase: 'lobby' }

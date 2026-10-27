@@ -5,6 +5,7 @@ import { loadSeat } from '../lib/seat'
 import { PHONE_SCREEN_CLASS } from '../lib/phoneScreen'
 import { useSeatFeed } from '../hooks/useSeatFeed'
 import { useGameModule } from '../hooks/useGameModule'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { PhoneLobby } from '../components/PhoneLobby'
 import type { GameInstance } from '../types/game'
 
@@ -14,6 +15,8 @@ function Message({ children }: { children: React.ReactNode }) {
 
 /** A player's phone: the shared lobby, then the game's PhoneView. Never scrolls. */
 export function PlayPage() {
+  // A phone in a game stays awake while it's open and visible.
+  useWakeLock()
   const { gameSlug, id } = useParams<{ gameSlug: string; id: string }>()
   const navigate = useNavigate()
   const seat = useMemo(() => (id ? loadSeat(id) : null), [id])

@@ -37,6 +37,9 @@ Two specs: one for the game, plus a framework spec iteration if the game needs t
 - Implement `GameModule` (`server/src/games/types.ts`):
   - `setup`, `applyAction`, `tableView`, `playerView`, `isFinished`, `activeSeats`, `legalActions` and `winners`.
   - Register it in `server/src/games/registry.ts`. That's the only server wiring.
+  - **Catalog:** a module is listed by default. Set `listed: false` to retire a game from selection (home page, Create Game, `POST /games/instances` refuses it) while keeping its code, tests and existing instances, as Tic-Tac-Toe is.
+  - **Cover art:** add `client/src/games/<slug>/cover.webp` (portrait 3:4, about 800 px wide, Joe supplies the art). The home page picks it up automatically (`gameCover()` in the client registry) and shows it as a large card that creates a game and jumps to its lobby.
+  - **Turn order:** if the real game has a "who goes first" rule that can't translate (e.g. "youngest player"), shuffle the seats into a random turn order in `setup`. Rematch re-runs `setup`, so every rematch reshuffles (Splendor does this).
 - **Pure and deterministic.** State and actions are plain JSON; no classes or Dates. No clock, and randomness only from the injected `Rng`. Never mutate the input state. No Express, Prisma or React imports.
 - **Validate every action as untrusted input** (wrong types, NaN, out-of-range indices, duplicates). Return `{ok:false, error}` for bad input and never throw. The pre-tag review fuzzes this.
 - **`legalActions` enumerates every concrete legal action,** including pending sub-steps. The phone uses it for "can I do this" cues, and the simulator uses it to play.
@@ -54,6 +57,7 @@ Two specs: one for the game, plus a framework spec iteration if the game needs t
   - Server: versioned optimistic writes, and per-viewer socket rooms.
   - Client: the TV feed queue (`useTableFeed`), reconnect resync, `SoundBoard` (audio unlock tap, mute), and the phone shell.
 - **Rematch:** `POST /games/instances/:id/rematch` (seat 0's token or the host) re-runs `setup` for the same players on a finished game: same instance, join code and seat tokens, no lobby. The TV feed treats finished → fresh as a new table, with no animation. Games only render the button: `PhoneViewProps.rematch` is set on seat 0's phone once the game is over.
+- **Wake lock:** the TV table and the phone play screens hold a screen wake lock while open and visible (`useWakeLock`, re-acquired when the page becomes visible or regains focus), so the computer running the TV never sleeps mid-game. Nothing to do per game.
 - **Game screens aren't selectable:** the TV shell and the phone shell carry `.game-surface` (`client/src/index.css`), so nothing can be selected by click-and-drag and images can't be dragged out. Inputs (and `.select-text`) opt back in. Don't undo this in a game's CSS.
 - If a game needs something the contract doesn't have, extend the contract in a framework spec iteration. Prove that **every existing game's test suite still passes**.
 

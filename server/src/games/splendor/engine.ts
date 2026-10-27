@@ -70,6 +70,9 @@ export interface SplendorState {
   players: PlayerState[]
   /** Seat whose move it is. */
   turn: number
+  /** Turn order: a random permutation of the seats drawn at setup (every game, every rematch). */
+  turnOrder: number[]
+  /** turnOrder[0]: the round ends when play would come back to this seat. */
   firstPlayer: number
   pending: Pending
   endTriggered: boolean
@@ -115,6 +118,7 @@ export interface SplendorTableView {
   bank: TokenCounts
   players: PublicPlayer[]
   turn: number
+  turnOrder: number[]
   firstPlayer: number
   /** Kind only (the discard amount / noble options are private to the active seat). */
   pending: null | { kind: 'discard' | 'noble'; seat: number }
@@ -152,6 +156,16 @@ const MAX_RESERVED = 3
 const WIN_POINTS = 15
 const BOARD_SLOTS = 4
 
+/**
+ * The game's turn order. States saved before turn orders existed fall back to seat order
+ * starting from the first player.
+ */
+function orderOf(s: Pick<SplendorState, 'turnOrder' | 'firstPlayer' | 'players'>): number[] {
+  if (Array.isArray(s.turnOrder) && s.turnOrder.length === s.players.length) return s.turnOrder
+  const n = s.players.length
+  return Array.from({ length: n }, (_, i) => (s.firstPlayer + i) % n)
+}
+
 function emptyTokens(): TokenCounts {
   return { white: 0, blue: 0, green: 0, red: 0, black: 0, gold: 0 }
 }
@@ -169,6 +183,7 @@ function cloneState(s: SplendorState): SplendorState {
       nobles: p.nobles.slice(),
     })),
     turn: s.turn,
+    turnOrder: orderOf(s).slice(),
     firstPlayer: s.firstPlayer,
     pending: s.pending
       ? s.pending.kind === 'discard'
@@ -323,7 +338,8 @@ function endTurn(s: SplendorState, seat: number, events: GameEvent[]): void {
     s.endTriggered = true
     events.push({ type: 'endTriggered', seat })
   }
-  const next = (seat + 1) % s.players.length
+  const order = orderOf(s)
+  const next = order[(order.indexOf(seat) + 1) % order.length]
   if (s.endTriggered && next === s.firstPlayer) {
     s.result = ranking(s)
     events.push({ type: 'gameOver', winners: s.result.winners, ranking: s.result.ranking })
@@ -389,7 +405,8 @@ export function setup(players: SeatInfo[], rng: Rng): { state: SplendorState; ev
     3: decks[3].splice(0, BOARD_SLOTS),
   } as Record<Tier, (string | null)[]>
   const nobles = shuffle(NOBLES.map((x) => x.id), rng).slice(0, n + 1)
-  const firstPlayer = Math.floor(rng() * n)
+  const turnOrder = shuffle(Array.from({ length: n }, (_, i) => i), rng)
+  const firstPlayer = turnOrder[0]
   const state: SplendorState = {
     decks,
     board,
@@ -397,6 +414,7 @@ export function setup(players: SeatInfo[], rng: Rng): { state: SplendorState; ev
     bank: { white: perGem, blue: perGem, green: perGem, red: perGem, black: perGem, gold: 5 },
     players: Array.from({ length: n }, () => ({ tokens: emptyTokens(), cards: [], reserved: [], nobles: [] })),
     turn: firstPlayer,
+    turnOrder,
     firstPlayer,
     pending: null,
     endTriggered: false,
@@ -644,6 +662,7 @@ export function tableView(s: SplendorState, players: SeatInfo[]): SplendorTableV
       }
     }),
     turn: s.turn,
+    turnOrder: orderOf(s).slice(),
     firstPlayer: s.firstPlayer,
     pending: s.pending ? { kind: s.pending.kind, seat: s.turn } : null,
     endTriggered: s.endTriggered,

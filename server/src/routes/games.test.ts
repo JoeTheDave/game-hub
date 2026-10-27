@@ -12,15 +12,17 @@ import type { Express } from 'express'
 import prisma from '../lib/prisma.js'
 import { createApp } from '../app.js'
 import { syncGameCatalog } from '../lib/gameInstances.js'
+import { createInstanceDirect } from '../test/instances.js'
 
 let app: Express
 let host: ReturnType<typeof request.agent>
 let gameId: string
+let hostUserId: string
 
+// Tic-Tac-Toe is unlisted (it can't be created through the API any more), but it stays the
+// simplest deterministic game for exercising the generic routes, so tests create it directly.
 async function createInstance() {
-  const res = await host.post('/api/games/instances').send({ gameId })
-  expect(res.status).toBe(201)
-  return res.body as { id: string; joinCode: string }
+  return createInstanceDirect('tic-tac-toe', hostUserId)
 }
 
 async function join(id: string) {
@@ -45,6 +47,7 @@ beforeAll(async () => {
   const email = `host-${Date.now()}@example.com`
   const reg = await host.post('/api/auth/register').send({ email, password: 'password123', passwordConfirmation: 'password123' })
   expect(reg.status).toBe(201)
+  hostUserId = reg.body.id
 })
 
 beforeEach(async () => {
@@ -57,10 +60,24 @@ afterAll(async () => {
 })
 
 describe('game catalog', () => {
-  it('lists registry games with player counts', async () => {
+  it('lists only listed registry games, with player counts', async () => {
     const res = await request(app).get('/api/games')
     expect(res.status).toBe(200)
-    expect(res.body).toContainEqual(expect.objectContaining({ slug: 'tic-tac-toe', minPlayers: 2, maxPlayers: 2 }))
+    expect(res.body).toContainEqual(expect.objectContaining({ slug: 'dragonheart', minPlayers: 2, maxPlayers: 2 }))
+    expect(res.body).toContainEqual(expect.objectContaining({ slug: 'splendor', minPlayers: 2, maxPlayers: 4 }))
+    expect(res.body.map((g: { slug: string }) => g.slug)).not.toContain('tic-tac-toe')
+  })
+
+  it('refuses to create an instance of an unlisted game', async () => {
+    const res = await host.post('/api/games/instances').send({ gameId })
+    expect(res.status).toBe(400)
+  })
+
+  it('creates an instance of a listed game', async () => {
+    const dh = (await prisma.game.findUniqueOrThrow({ where: { slug: 'dragonheart' } })).id
+    const res = await host.post('/api/games/instances').send({ gameId: dh })
+    expect(res.status).toBe(201)
+    expect(res.body.game.slug).toBe('dragonheart')
   })
 
   it('requires a session to create an instance', async () => {

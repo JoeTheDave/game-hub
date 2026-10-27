@@ -25,6 +25,11 @@ export interface GameModule<S, A> {
   name: string
   minPlayers: number
   maxPlayers: number
+  /**
+   * Shown in the game catalog (home page, Create Game). Default true. An unlisted game keeps its
+   * code, tests and existing instances, but no new instance can be created through the API.
+   */
+  listed?: boolean
   /** Called on Start with the seated players (ordered by playerOrder). Deterministic given rng. */
   setup(players: SeatInfo[], rng: Rng, options?: unknown): { state: S; events: GameEvent[] }
   /** Validate + apply one action from a seat. Pure: never mutates the input state. */

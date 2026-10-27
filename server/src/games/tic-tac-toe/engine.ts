@@ -68,6 +68,8 @@ export const ticTacToe: GameModule<TicTacToeState, TicTacToeAction> = {
   name: 'Tic-Tac-Toe',
   minPlayers: 2,
   maxPlayers: 2,
+  // Retired from selection (it was the proof of concept). The code stays, and route tests use it.
+  listed: false,
 
   setup(_players: SeatInfo[]) {
     return {

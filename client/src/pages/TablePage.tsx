@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTableFeed } from '../hooks/useTableFeed'
 import { useGameModule } from '../hooks/useGameModule'
 import { useSoundBoard } from '../hooks/useSoundBoard'
+import { useWakeLock } from '../hooks/useWakeLock'
 
 /**
  * The shared table screen (TV). Full-screen; the game's TableView owns everything inside.
@@ -14,6 +15,8 @@ export function TablePage() {
   const { current, done, error, loading } = useTableFeed(id ?? null)
   const mod = useGameModule(gameSlug)
   const { soundBoard, muted, unlocked, toggleMute } = useSoundBoard()
+  // The TV table keeps the computer awake while it's open and visible.
+  useWakeLock()
   const prepared = useRef<string | null>(null)
 
   useEffect(() => {

@@ -10,6 +10,7 @@ import http from 'http'
 import type { AddressInfo } from 'net'
 import request from 'supertest'
 import { io as ioClient, type Socket } from 'socket.io-client'
+import { createInstanceDirect } from '../test/instances.js'
 import prisma from './prisma.js'
 import { createApp } from '../app.js'
 import { initSocket, getIO } from './socket.js'
@@ -52,9 +53,9 @@ describe('per-viewer sockets', () => {
   it('only admits a seat with its token, and never broadcasts joinTokens', async () => {
     const hostAgent = request.agent(app)
     const email = `sock-${Date.now()}@example.com`
-    await hostAgent.post('/api/auth/register').send({ email, password: 'password123', passwordConfirmation: 'password123' })
-    const gameId = (await prisma.game.findUniqueOrThrow({ where: { slug: 'tic-tac-toe' } })).id
-    const inst = (await hostAgent.post('/api/games/instances').send({ gameId })).body
+    const reg = await hostAgent.post('/api/auth/register').send({ email, password: 'password123', passwordConfirmation: 'password123' })
+    // Tic-Tac-Toe is unlisted, so the test creates it directly (see server/src/test/instances.ts).
+    const inst = await createInstanceDirect('tic-tac-toe', reg.body.id)
     const a = (await request(app).post(`/api/games/instances/${inst.id}/join`).send({})).body.player
     const b = (await request(app).post(`/api/games/instances/${inst.id}/join`).send({})).body.player
 

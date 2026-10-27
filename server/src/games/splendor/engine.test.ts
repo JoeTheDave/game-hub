@@ -18,7 +18,7 @@ const rng = seededRng(42)
 
 function fresh(n = 2, seed = 1): SplendorState {
   const { state } = setup(seats(n), seededRng(seed))
-  return { ...state, turn: 0, firstPlayer: 0 }
+  return { ...state, turn: 0, firstPlayer: 0, turnOrder: Array.from({ length: n }, (_, i) => i) }
 }
 
 function act(s: SplendorState, a: SplendorAction, seat = s.turn) {
@@ -409,5 +409,49 @@ describe('hidden information', () => {
     ])
     expect(t.lastAction!.summary).toBe('Joe took 1 diamond, 1 sapphire, 1 emerald')
     expect(t.players[0]).toMatchObject({ name: 'Joe', color: 'red', tokenCount: 3 })
+  })
+})
+
+describe('turn order (shuffled every game)', () => {
+  it('draws a permutation of the seats, and the first player leads it', () => {
+    for (const n of [2, 3, 4]) {
+      for (let seed = 0; seed < 20; seed++) {
+        const { state } = setup(seats(n), seededRng(seed))
+        expect([...state.turnOrder].sort()).toEqual(Array.from({ length: n }, (_, i) => i))
+        expect(state.firstPlayer).toBe(state.turnOrder[0])
+        expect(state.turn).toBe(state.turnOrder[0])
+      }
+    }
+    // Not always seat order: across seeds, 4-player orders vary beyond a rotation of 0,1,2,3.
+    const orders = new Set(Array.from({ length: 40 }, (_, i) => setup(seats(4), seededRng(i)).state.turnOrder.join('')))
+    const rotations = new Set(['0123', '1230', '2301', '3012'])
+    expect([...orders].some((o) => !rotations.has(o))).toBe(true)
+  })
+
+  it('passes turns along the drawn order, and the round ends back at the first player', () => {
+    const { state: s0 } = setup(seats(4), seededRng(5))
+    let s = s0
+    const starts: number[] = [s.turn]
+    const r = seededRng(9)
+    for (let i = 0; i < 400 && !s.result; i++) {
+      const seat = s.turn
+      const legal = legalActions(s, seat)
+      const res = applyAction(s, seat, legal[Math.floor(r() * legal.length)], r)
+      if (!res.ok) throw new Error(res.error)
+      if (res.state.turn !== seat && !res.state.result) starts.push(res.state.turn)
+      s = res.state
+    }
+    // Every turn hand-off follows the drawn order.
+    starts.forEach((seat, i) => expect(seat).toBe(s0.turnOrder[i % 4]))
+    // The game ended at a round boundary: the last seat to play is the last in the order.
+    expect(s.result).not.toBeNull()
+    expect(starts[starts.length - 1]).toBe(s0.turnOrder[3])
+  })
+
+  it('falls back to seat order from the first player for states saved before turn orders', () => {
+    const { state } = setup(seats(3), seededRng(2))
+    const legacy = { ...state, firstPlayer: 1, turn: 1 } as SplendorState
+    delete (legacy as Partial<SplendorState>).turnOrder
+    expect(tableView(legacy, seats(3)).turnOrder).toEqual([1, 2, 0])
   })
 })

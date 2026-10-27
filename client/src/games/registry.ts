@@ -18,3 +18,17 @@ export async function loadGame(slug: string): Promise<ClientGameModule | null> {
   if (!hasGame(slug)) return null
   return (await GAMES[slug]()).default
 }
+
+/**
+ * Each game's cover art (client/src/games/<slug>/cover.webp), loaded eagerly as plain URLs so the
+ * home page can show every game without loading any game module.
+ */
+const COVERS = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('./*/cover.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+  ).map(([path, url]) => [path.split('/')[1], url])
+)
+
+export function gameCover(slug: string): string | null {
+  return COVERS[slug] ?? null
+}
