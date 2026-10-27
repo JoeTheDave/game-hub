@@ -227,7 +227,7 @@ function Finished({ view, me }: { view: DragonheartPlayerView; me: number }) {
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-4">
       <div className="dh-title text-4xl">Dragonheart</div>
-      <div className="dh-serif text-lg text-center">{verdict(view)}</div>
+      {verdict(view) && <div className="dh-serif text-lg text-center">{verdict(view)}</div>}
       <div className="w-full max-w-sm flex flex-col gap-2">
         {view.players.map((p) => (
           <div

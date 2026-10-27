@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Game screens (TV table and phone): content can't be selected by click-and-drag, and images
+   can't be dragged out. Inputs that need typing opt back in with .select-text. */
+.game-surface,
+.game-surface * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.game-surface img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+.game-surface input,
+.game-surface textarea,
+.game-surface .select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}

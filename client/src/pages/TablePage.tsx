@@ -27,7 +27,7 @@ export function TablePage() {
     if (current?.instance.phase === 'lobby') navigate(`/lobby/${gameSlug}/${id}`, { replace: true })
   }, [current, gameSlug, id, navigate])
 
-  const shell = 'fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
+  const shell = 'game-surface fixed inset-0 overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
   const centered = `${shell} flex items-center justify-center text-slate-400`
 
   if (loading && !current) return <div className={centered}>Loading…</div>

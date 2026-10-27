@@ -461,12 +461,12 @@ function PlaceCard({ p, x, y, first, finalTurn, maxW }: { p: PublicPlayer; x: nu
   )
 }
 
-/** The headline for the end of the game, by who won. */
-export function verdict(view: DragonheartTableView): string {
+/** The headline for the end of the game, by who won (none when red wins: Joe dropped "sleeps forever"). */
+export function verdict(view: DragonheartTableView): string | null {
   const w = view.result?.winners ?? []
   if (w.length !== 1) return 'Neither side prevails — the Great Dragon stirs, and sleeps'
   const winner = view.players.find((p) => p.seat === w[0])
-  return winner?.deck === 'green' ? 'The Great Dragon is free!' : 'The Great Dragon sleeps forever'
+  return winner?.deck === 'green' ? 'The Great Dragon is free!' : null
 }
 
 function Standings({ view }: { view: DragonheartTableView }) {
@@ -488,9 +488,13 @@ function Standings({ view }: { view: DragonheartTableView }) {
         <div className="dh-title" style={{ fontSize: 52, textAlign: 'center' }}>
           Dragonheart
         </div>
-        <div className="dh-serif" style={{ fontSize: 26, textAlign: 'center', margin: '6px 0 20px' }}>
-          {verdict(view)}
-        </div>
+        {verdict(view) ? (
+          <div className="dh-serif" style={{ fontSize: 26, textAlign: 'center', margin: '6px 0 20px' }}>
+            {verdict(view)}
+          </div>
+        ) : (
+          <div style={{ height: 20 }} />
+        )}
         {view.players.map((p) => {
           const won = r.winners.includes(p.seat)
           const pile = r.scorePiles[p.seat] ?? []

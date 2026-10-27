@@ -53,6 +53,7 @@ Two specs: one for the game, plus a framework spec iteration if the game needs t
   - Server: join with a seat `joinToken`, the lobby, and Start (the host or seat 0; it appears on seat 0's phone once `players >= minPlayers`; no "admin" label).
   - Server: versioned optimistic writes, and per-viewer socket rooms.
   - Client: the TV feed queue (`useTableFeed`), reconnect resync, `SoundBoard` (audio unlock tap, mute), and the phone shell.
+- **Game screens aren't selectable:** the TV shell and the phone shell carry `.game-surface` (`client/src/index.css`), so nothing can be selected by click-and-drag and images can't be dragged out. Inputs (and `.select-text`) opt back in. Don't undo this in a game's CSS.
 - If a game needs something the contract doesn't have, extend the contract in a framework spec iteration. Prove that **every existing game's test suite still passes**.
 
 ## 5. The TV: a tabletop, not a dashboard
