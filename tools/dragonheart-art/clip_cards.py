@@ -32,6 +32,7 @@ def main():
     assert (W, H) == (geo['source']['w'], geo['source']['h']), 'geometry was measured on a different image size'
     board.save(os.path.join(GAME, 'assets', 'board', 'panorama.webp'), 'WEBP', quality=95, method=6)
     os.makedirs(os.path.join(GAME, 'assets', 'cards'), exist_ok=True)
+    manifest = {'source': {'w': W, 'h': H}, 'clips': {}}
     for kind in KINDS:
         sp = geo['spaces'][kind]
         o = sp['outlines'][0]
@@ -41,7 +42,12 @@ def main():
             clip = clip.rotate(90, expand=True)
         clip = clip.resize((clip.width * 2, clip.height * 2), Image.LANCZOS)
         clip.save(os.path.join(GAME, 'assets', 'cards', f'{kind}.webp'), 'WEBP', quality=92, method=6)
+        manifest['clips'][kind] = {'box': list(box), 'rotated': sp['orientation'] == 'landscape'}
         print(kind, box, clip.size)
+    # The exact pixel boxes clipped, so tests can prove each card's art is its outline's region.
+    with open(os.path.join(GAME, 'assets', 'cards', 'clips.json'), 'w') as f:
+        json.dump(manifest, f, indent=2)
+        f.write('\n')
     if '--check' in sys.argv:
         out = sys.argv[sys.argv.index('--check') + 1]
         os.makedirs(out, exist_ok=True)

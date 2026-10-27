@@ -81,10 +81,6 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
         <div className="flex items-center gap-2">
           <span className="w-3.5 h-5 rounded-sm shrink-0" style={{ background: deckHex }} title={`${me?.deck} deck`} />
           <span className="dh-serif text-xl truncate flex-1">{me?.name}</span>
-          <span className="flex items-center gap-1 text-sm text-amber-100/85">
-            {view.handMax > 5 && <GreatDragon size={26} />}
-            Hand {view.hand.length}/{view.handMax}
-          </span>
           <button
             type="button"
             onClick={() => setPileOpen(true)}

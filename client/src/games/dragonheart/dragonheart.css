@@ -75,6 +75,7 @@
 
 /* Card values woven into the frame's cartouches: white Cinzel with a dark engraved outline. */
 .dh-cartouche-numeral {
-  text-shadow: 0 0 0.06em #000, 0 0.04em 0.08em rgba(0, 0, 0, 0.9);
+  /* A black glow all round so the value stands out on any art. */
+  text-shadow: 0 0 0.05em #000, 0 0 0.1em #000, 0 0 0.2em #000, 0 0 0.35em rgba(0, 0, 0, 0.8);
   -webkit-text-stroke: 0.025em rgba(20, 20, 20, 0.85);
 }

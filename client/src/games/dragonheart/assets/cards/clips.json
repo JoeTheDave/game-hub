@@ -1,0 +1,89 @@
+{
+  "source": {
+    "w": 2172,
+    "h": 724
+  },
+  "clips": {
+    "treasure": {
+      "box": [
+        849,
+        23,
+        1068,
+        359
+      ],
+      "rotated": false
+    },
+    "fireDragon": {
+      "box": [
+        314,
+        23,
+        533,
+        359
+      ],
+      "rotated": false
+    },
+    "petrified": {
+      "box": [
+        1643,
+        48,
+        1980,
+        265
+      ],
+      "rotated": true
+    },
+    "sorceress": {
+      "box": [
+        1338,
+        22,
+        1560,
+        358
+      ],
+      "rotated": false
+    },
+    "troll": {
+      "box": [
+        1586,
+        338,
+        1805,
+        671
+      ],
+      "rotated": false
+    },
+    "dwarf": {
+      "box": [
+        1841,
+        288,
+        2063,
+        621
+      ],
+      "rotated": false
+    },
+    "knight": {
+      "box": [
+        1081,
+        337,
+        1301,
+        671
+      ],
+      "rotated": false
+    },
+    "huntress": {
+      "box": [
+        25,
+        278,
+        247,
+        616
+      ],
+      "rotated": false
+    },
+    "ship": {
+      "box": [
+        549,
+        278,
+        768,
+        615
+      ],
+      "rotated": false
+    }
+  }
+}

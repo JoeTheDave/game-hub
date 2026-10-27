@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { CAPACITY, SPACES } from '@games/dragonheart/data'
 import { flightBox, type Rect } from './flyers'
+import geometry from './boardGeometry.json'
+import clips from './assets/cards/clips.json'
 import {
   BOARD,
   H,
@@ -43,6 +45,32 @@ describe('board layout (measured from the real board)', () => {
     expect(inside(boardDragonRect(), BOARD)).toBe(true)
     for (const a of rects) for (const b of rects) if (a.space !== b.space) expect(overlaps(a.r, b.r)).toBe(false)
     for (const a of rects) expect(overlaps(a.r, boardDragonRect())).toBe(false)
+  })
+
+  it("clips each card's art from exactly its front outline's board region, so a card on that outline matches the board", () => {
+    const geo = geometry as unknown as {
+      source: { w: number; h: number }
+      spaces: Record<string, { outlines: { x: number; y: number; w: number; h: number }[]; orientation: string }>
+    }
+    const c = clips as unknown as { source: { w: number; h: number }; clips: Record<string, { box: number[]; rotated: boolean }> }
+    expect(c.source).toEqual({ w: geo.source.w, h: geo.source.h })
+    for (const s of SPACES) {
+      const o = geo.spaces[s].outlines[0]
+      const [x0, y0, x1, y1] = c.clips[s].box
+      // within half a source pixel of the measured outline
+      expect(Math.abs(x0 - o.x * c.source.w)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(y0 - o.y * c.source.h)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(x1 - (o.x + o.w) * c.source.w)).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(y1 - (o.y + o.h) * c.source.h)).toBeLessThanOrEqual(0.5)
+      // a landscape clip is stored turned to portrait and turned back 90° on the board
+      expect(c.clips[s].rotated).toBe(geo.spaces[s].orientation === 'landscape')
+      const slot = slotRect(s, 0)
+      expect(slot.r ?? 0).toBe(c.clips[s].rotated ? 90 : 0)
+      // the card's art box (the whole card) covers exactly the front outline on screen
+      const b = boundsOf(slot)
+      const fo = outlineRect(s, 0)
+      for (const k of ['x', 'y', 'w', 'h'] as const) expect(b[k]).toBeCloseTo(fo[k], 5)
+    }
   })
 
   it('turns cards 90° on the landscape outlines (Petrified Dragon, the pile below the Ship)', () => {

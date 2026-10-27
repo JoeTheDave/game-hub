@@ -218,7 +218,7 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
           const r = slotRect(space, i)
           return (
             <div key={id} data-anchor={`slot-${space}-${i}`} style={placed(local(r), { zIndex: slotZ(i) })}>
-              <Card id={id} size={r.w} />
+              <Card id={id} size={r.w} height={r.h} />
             </div>
           )
         })}
@@ -233,7 +233,7 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
       <StackEdges count={sv.count - 1} size={r.w} face="up" />
       {top && (
         <div data-anchor={`top-${space}`} style={{ position: 'absolute', inset: 0 }}>
-          <Card id={top} size={r.w} />
+          <Card id={top} size={r.w} height={r.h} />
         </div>
       )}
     </div>
@@ -265,7 +265,7 @@ function PileBelowShip({ view }: { view: DragonheartTableView }) {
           <StackEdges count={view.belowShip.count - 1} size={r.w} face="up" />
           {top && (
             <div data-anchor="belowShip" style={{ position: 'absolute', inset: 0 }}>
-              <Card id={top} size={r.w} />
+              <Card id={top} size={r.w} height={r.h} />
             </div>
           )}
         </div>
@@ -382,7 +382,7 @@ function ScorePile({ seat, rect, count, top }: { seat: number; rect: Rect; count
   return (
     <div data-anchor={`score-${seat}`} style={placed(rect)}>
       <StackEdges count={count - 1} size={rect.w} face="up" />
-      <Card id={top} size={rect.w} style={{ position: 'absolute', inset: 0 }} />
+      <Card id={top} size={rect.w} height={rect.h} style={{ position: 'absolute', inset: 0 }} />
     </div>
   )
 }
@@ -573,7 +573,7 @@ export function planAnimation(
         if (prevTop) {
           const r = slotRect(space, 0)
           const lands = t + (ids.length - 1) * STAGGER_MS + CARD_FLY
-          add({ from: r, to: r, node: <Card id={prevTop} size={r.w} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z + before - 1 })
+          add({ from: r, to: r, node: <Card id={prevTop} size={r.w} height={r.h} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z + before - 1 })
         }
         ids.forEach((id, j) => {
           const from = handRect(seat, Math.max(0, n0 - ids.length + j), n0)
@@ -583,7 +583,7 @@ export function planAnimation(
             {
               from,
               to,
-              node: <FlipCard w={to.w} h={to.h} first={<CardBack deck={deck} size={to.w} />} second={<Card id={id} size={to.w} />} />,
+              node: <FlipCard w={to.w} h={to.h} first={<CardBack deck={deck} size={to.w} height={to.h} />} second={<Card id={id} size={to.w} height={to.h} />} />,
               delay: t + j * STAGGER_MS,
               duration: CARD_FLY,
               flip: true,
@@ -614,11 +614,11 @@ export function planAnimation(
         const prevSeat = prev.players.find((p) => p.seat === seat)
         const lands = t + (pieces.length - 1) * STAGGER_MS + COLLECT_FLY
         if (prevSeat?.scoreTop) {
-          add({ from: to, to, node: <Card id={prevSeat.scoreTop} size={to.w} />, delay: 0, duration: lands, vanishAt: lands, z: 5 })
+          add({ from: to, to, node: <Card id={prevSeat.scoreTop} size={to.w} height={to.h} />, delay: 0, duration: lands, vanishAt: lands, z: 5 })
         }
         pieces.forEach((pc, i) => {
           const src = pc.id ? source(pc.id, pc.rect, t + i * STAGGER_MS) : { rect: pc.rect, delay: t + i * STAGGER_MS, appear: true, z: undefined }
-          const face = pc.id ? <Card id={pc.id} size={to.w} /> : <CardBack deck={prev.players[seat]?.deck ?? 'green'} size={to.w} />
+          const face = pc.id ? <Card id={pc.id} size={to.w} height={to.h} /> : <CardBack deck={prev.players[seat]?.deck ?? 'green'} size={to.w} />
           add(
             {
               from: src.rect,
@@ -663,7 +663,7 @@ export function planAnimation(
         const to = belowShipRect()
         ids.forEach((id, i) => {
           const src = source(id, slotRect(from, i), t + i * STAGGER_MS)
-          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
+          add({ from: src.rect, to, node: <Card id={id} size={to.w} height={to.h} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
         })
         hidden.push('belowShip')
         sounds.push({ name: 'card-slide', at: t })
@@ -676,7 +676,7 @@ export function planAnimation(
         const to = shipStackRect(index)
         ids.forEach((id, i) => {
           const src = source(id, slotRect('ship', i), t + i * STAGGER_MS)
-          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
+          add({ from: src.rect, to, node: <Card id={id} size={to.w} height={to.h} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
         })
         hidden.push(`shipstack-${index}`)
         sounds.push({ name: 'ship-bell', at: t })

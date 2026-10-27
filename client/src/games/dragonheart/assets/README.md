@@ -86,3 +86,8 @@ The original cards' artistic border, derived from the scanned Troll card (vault 
 
 ### Great Dragon token: `token/great-dragon.webp`
 Joe's own token art (a silver coin with a dragon head and a key-pattern rim; supplied in the thread 2026-10-27, also copied to vault `Board Art/Dragon Token - Joe.png`), trimmed to its bounding box and resized to 400×400 with alpha. It replaces the SVG medallion.
+
+## Iteration 4 (card frame trim, band repair, art alignment)
+- `tools/dragonheart-art/make_frame.py` now trims the light-grey card border, so the card's edge is the silver filigree's outer edge (`BAND_OUTER`, in the straightened scan's px). The trimmed frame is stretched back to 660×1008 (outline shape) with a 4%-of-width corner radius.
+- **Band repair:** cutting the Troll art out had left transparent holes in the side bands next to the window. They showed as a thick dark bar on every card. A clean straight filigree strip from the top band is now tiled under the whole band ring, and the right band between the top-right cartouche and the dragon's tail uses that strip outright (it still showed troll fur).
+- **Alignment:** the card's art layer is the outline's own board region (`cards/clips.json` records the exact pixel boxes) stretched to the full card box with no zoom or offset, under the frame. Board cards pass the outline's exact height, so they cover the painted board pixel-for-pixel.

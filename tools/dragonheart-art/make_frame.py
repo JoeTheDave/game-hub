@@ -42,6 +42,8 @@ CARTOUCHES = {  # outer rects of the four dark corner cartouches
     'bl': (57, 838, 157, 966),
     'br': (506, 841, 601, 961),
 }
+# Outer edge of the silver filigree band (the grey card border outside it is trimmed off).
+BAND_OUTER = (47, 45, 623, 984)
 # Strips inside the window where the silver dragon overlaps the art (kept if silver).
 DRAGON_STRIPS = [(80, 80, 150, 680), (520, 560, 585, 951)]
 
@@ -141,25 +143,73 @@ def main():
     # Soften the alpha edge by a pixel so the cut doesn't alias.
     alpha = np.asarray(Image.fromarray((alpha * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7))).astype(float) / 255
 
-    # 5. Rounded outer corners (the scan's white background outside the card goes transparent).
-    r = 34
+    # 5. Repair the side bands (iteration 4). Removing the Troll's paint left holes in the band
+    #    next to the art window (Joe saw them as a thick dark bar on every card). Underlay the
+    #    whole band ring with a clean straight filigree strip taken from the top band between the
+    #    cartouches, so any hole shows filigree instead of nothing.
+    frame = Image.fromarray((np.dstack([rgb, alpha]) * 255).clip(0, 255).astype(np.uint8), 'RGBA')
+    tx0, tx1 = sc((240, 0, 440, 0))[0], sc((240, 0, 440, 0))[2]
+    by0, by1 = sc((0, BAND_OUTER[1], 0, WINDOW[1]))[1], sc((0, BAND_OUTER[1], 0, WINDOW[1]))[3]
+    strip = frame.crop((tx0, by0, tx1, by1)).convert('RGB').convert('RGBA')  # opaque band texture
+    under = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    ox0, oy0, ox1, oy1 = sc(BAND_OUTER)
+    ix0w, iy0w, ix1w, iy1w = sc(WINDOW)
+    def tile_h(img, x0, x1, y):
+        x = x0
+        while x < x1:
+            under.paste(img.crop((0, 0, min(img.width, x1 - x), img.height)), (x, y))
+            x += img.width
+    def tile_v(img, y0, y1, x):
+        y = y0
+        while y < y1:
+            under.paste(img.crop((0, 0, img.width, min(img.height, y1 - y))), (x, y))
+            y += img.height
+    bh = by1 - by0
+    tile_h(strip, ox0, ox1, oy0)                                         # top
+    tile_h(strip.transpose(Image.FLIP_TOP_BOTTOM), ox0, ox1, oy1 - bh)   # bottom
+    side = strip.rotate(90, expand=True)                                 # vertical band, outer edge left
+    tile_v(side, oy0, oy1, ox0)                                          # left
+    tile_v(side.transpose(Image.FLIP_LEFT_RIGHT), oy0, oy1, ox1 - bh)    # right
+    # The underlay stops at the window so the art still shows there.
+    ua = np.asarray(under).copy()
+    ua[iy0w:iy1w, ix0w:ix1w, 3] = 0
+    under = Image.fromarray(ua, 'RGBA')
+    clean = under.copy()
+    under.alpha_composite(frame)
+    frame = under
+    # The right band between the top-right cartouche and the dragon's tail still shows the
+    # Troll's fur through the filigree; that stretch is plain band, so use the clean strip there.
+    rb = sc((WINDOW[2], CARTOUCHES['tr'][3], BAND_OUTER[2], DRAGON_STRIPS[1][1]))
+    frame.paste(clean.crop(rb), rb[:2])
+
+    # 6. Trim the light-grey outer border (iteration 4): the card's edge becomes the silver
+    #    filigree's outer edge. The trimmed frame is stretched back to the outline shape W x H
+    #    (a small vertical squash of the ornament) so cards still equal their board outlines.
+    trim = sc(BAND_OUTER)
+    tw, th = trim[2] - trim[0], trim[3] - trim[1]
+    frame = frame.crop(trim).resize((W, H), Image.LANCZOS)
+    rgba = np.asarray(frame).astype(float) / 255
+    alpha = rgba[..., 3].copy()
+
+    # 7. Rounded outer corners (about 4% of the width).
+    r = int(round(W * 0.04))
     yy, xx = np.mgrid[0:H, 0:W]
     for cx, cy in ((r, r), (W - r - 1, r), (r, H - r - 1), (W - r - 1, H - r - 1)):
         inx = (xx < r) if cx == r else (xx > W - r - 1)
         iny = (yy < r) if cy == r else (yy > H - r - 1)
         corner = inx & iny & ((xx - cx) ** 2 + (yy - cy) ** 2 > r * r)
         alpha[corner] = 0
+    rgba[..., 3] = alpha
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    rgba = np.dstack([rgb, alpha])
     Image.fromarray((rgba * 255).clip(0, 255).astype(np.uint8), 'RGBA').save(OUT_DIR / 'frame.webp', quality=95, method=6)
 
     def frac(rect):
         x0, y0, x1, y1 = sc(rect)
-        return {'x': x0 / W, 'y': y0 / H, 'w': (x1 - x0) / W, 'h': (y1 - y0) / H}
+        return {'x': (x0 - trim[0]) / tw, 'y': (y0 - trim[1]) / th, 'w': (x1 - x0) / tw, 'h': (y1 - y0) / th}
 
     meta = {
-        'source': 'Card Faces - All Types.jpg (Troll card), straightened; numbers erased; window cut out',
+        'source': 'Card Faces - All Types.jpg (Troll card), straightened; numbers erased; window cut out; side bands repaired; grey border trimmed',
         'size': [W, H],
         'window': frac(WINDOW),
         'cartouches': {k: frac(v) for k, v in CARTOUCHES.items()},

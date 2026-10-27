@@ -23,11 +23,8 @@ interface Frac {
   w: number
   h: number
 }
-const WINDOW = frameMeta.window as Frac
 const CARTOUCHES = frameMeta.cartouches as Record<'tl' | 'tr' | 'bl' | 'br', Frac>
 const pct = (v: number) => `${(v * 100).toFixed(3)}%`
-/** The board clip carries its painted outline at the edges; zoom slightly past it inside the window. */
-const ART_BLEED = 0.07
 
 export const DECK_FIELD: Record<DeckColor, { base: string; light: string }> = {
   green: { base: '#1f5a2a', light: '#3f8a3c' },
@@ -101,7 +98,11 @@ function Cartouche({ points, kind, at }: { points: number; kind: Kind; at: 'tl' 
 }
 
 /** A face-up Dragonheart card: board-clipped art inside the original card's frame, values in the cartouches. */
-export function Card({ id, size, style }: { id: string; size: number; style?: CSSProperties }) {
+/**
+ * `height` defaults to the card shape; on the board pass the outline's exact height so the art
+ * (the outline's own board region, stretched to fill) lines up pixel-for-pixel with the board.
+ */
+export function Card({ id, size, height, style }: { id: string; size: number; height?: number; style?: CSSProperties }) {
   const def = CARD_BY_ID[id]
   const kind = def?.kind ?? 'treasure'
   const pts = def?.points ?? 0
@@ -112,28 +113,21 @@ export function Card({ id, size, style }: { id: string; size: number; style?: CS
       style={{
         position: 'relative',
         width: size,
-        height: size * CARD_RATIO,
+        height: height ?? size * CARD_RATIO,
         fontSize: size / 10,
         borderRadius: CARD_RADIUS,
         overflow: 'hidden',
         ...style,
       }}
     >
-      <div style={{ position: 'absolute', left: pct(WINDOW.x), top: pct(WINDOW.y), width: pct(WINDOW.w), height: pct(WINDOW.h), overflow: 'hidden', background: '#2a2622' }}>
-        <img
-          src={CARD_IMG[kind]}
-          alt=""
-          draggable={false}
-          style={{
-            position: 'absolute',
-            left: pct(-ART_BLEED),
-            top: pct(-ART_BLEED),
-            width: pct(1 + 2 * ART_BLEED),
-            height: pct(1 + 2 * ART_BLEED),
-            objectFit: 'cover',
-          }}
-        />
-      </div>
+      {/* The art is the board region of the outline itself, filling the whole card with no zoom or
+          offset, so on its outline every point of the card shows the board pixel it covers. */}
+      <img
+        src={CARD_IMG[kind]}
+        alt=""
+        draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }}
+      />
       <img src={FRAME_IMG} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2 }} />
       <Cartouche points={pts} kind={kind} at="tl" />
       <Cartouche points={pts} kind={kind} at="tr" />
@@ -144,14 +138,14 @@ export function Card({ id, size, style }: { id: string; size: number; style?: CS
 }
 
 /** A card back: the repainted green or red back art inside the grey border and silver frame. */
-export function CardBack({ deck, size, style }: { deck: DeckColor; size: number; style?: CSSProperties }) {
+export function CardBack({ deck, size, height, style }: { deck: DeckColor; size: number; height?: number; style?: CSSProperties }) {
   return (
     <div
       className="dh-card"
       style={{
         position: 'relative',
         width: size,
-        height: size * CARD_RATIO,
+        height: height ?? size * CARD_RATIO,
         fontSize: size / 10,
         borderRadius: CARD_RADIUS,
         background: 'linear-gradient(160deg, #d9d6d0, #bfbab2)',
