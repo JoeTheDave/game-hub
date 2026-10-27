@@ -140,7 +140,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         {/* The Knight/Huntress pile, lying below the Ship */}
         <PileBelowShip view={view} />
 
-        {/* An extremely subtle "count · points" under each space holding 2+ cards */}
+        {/* A subtle "N pts" under each space holding 2+ cards */}
         <StackNotes view={view} />
 
         {/* Ship stacks beside it (the third one ends the game) */}
@@ -186,18 +186,23 @@ function Board({ view }: { view: DragonheartTableView }) {
         boxShadow: '0 14px 30px rgba(0,0,0,.6), inset 0 0 0 3px rgba(20,12,6,.55), inset 0 0 60px rgba(0,0,0,.35)',
       }}
     >
+      {/* A light milky shade over the painted board: cards (above it) read clearer, so placed cards stand out. */}
+      <div style={{ position: 'absolute', inset: 0, borderRadius: 14, background: BOARD_SHADE, pointerEvents: 'none', zIndex: 1 }} />
       {/* The outlines and arrows are painted into the board art; cards sit inside the measured outlines. */}
       {SPACES.map((space) => (
         <SpaceCards key={space} space={space} view={view} />
       ))}
       {view.greatDragon === 'board' && (
-        <div data-anchor="dragon" style={placed(local(boardDragonRect()))}>
+        <div data-anchor="dragon" style={placed(local(boardDragonRect()), { zIndex: 3 })}>
           <GreatDragon size={boardDragonRect().w} />
         </div>
       )}
     </div>
   )
 }
+
+/** The milky overshade on the board image (cards render above it, unshaded). */
+export const BOARD_SHADE = 'rgba(255, 250, 240, 0.26)'
 
 /** Board-local copy of a canvas rect (pieces on the board render inside the board element). */
 const local = (r: Rect): Rect => ({ ...r, x: r.x - BOARD.x, y: r.y - BOARD.y })
@@ -206,7 +211,7 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
   const cap = CAPACITY[space]
   const sv = view.spaces[space]
   if (cap > 0) {
-    // Capacity spaces fill back (lower-right outline) to front: the newest card is frontmost, on top.
+    // Capacity spaces fill from the upper-left outline down-right; each later card lies on top.
     return (
       <>
         {sv.visible.map((id, i) => {
@@ -269,10 +274,10 @@ function PileBelowShip({ view }: { view: DragonheartTableView }) {
   )
 }
 
-/** The subtle note for a space: "count · points", only when it holds 2 or more cards. */
+/** The subtle note for a space: its total points ("7 pts"), only when it holds 2 or more cards. */
 export function noteText(count: number, points: number): string | null {
   if (count < 2) return null
-  return `${count} · ${points}`
+  return `${points} pts`
 }
 
 function StackNotes({ view }: { view: DragonheartTableView }) {
@@ -369,25 +374,31 @@ function FaceDownPile({ anchor, rect, count, deck }: { anchor: string; rect: Rec
   )
 }
 
+/** A player's score pile: face-up (Joe, iteration 3); its top card shows, thickness hints at its size. */
+function ScorePile({ seat, rect, count, top }: { seat: number; rect: Rect; count: number; top: string | null }) {
+  if (count <= 0 || !top) {
+    return <Outline size={rect.w} style={{ left: rect.x, top: rect.y, opacity: 0.4 }} />
+  }
+  return (
+    <div data-anchor={`score-${seat}`} style={placed(rect)}>
+      <StackEdges count={count - 1} size={rect.w} face="up" />
+      <Card id={top} size={rect.w} style={{ position: 'absolute', inset: 0 }} />
+    </div>
+  )
+}
+
 function PlayerSpot({ p, first, finalTurn }: { p: PublicPlayer; first: boolean; finalTurn: boolean }) {
   const s = spotLayout(zoneFor(p.seat), p.seat)
   return (
     <>
-      <PlaceCard
-        p={p}
-        x={p.seat === 1 && p.hasDragon ? s.left + 110 : s.left}
-        y={s.top}
-        first={first}
-        finalTurn={finalTurn}
-        maxW={s.contentW - (p.hasDragon ? 110 : 0)}
-      />
+      <PlaceCard p={p} x={s.left} y={s.top} first={first} finalTurn={finalTurn} maxW={s.contentW} />
       <FaceDownPile anchor={`deck-${p.seat}`} rect={deckRect(p.seat)} count={p.deckCount} deck={p.deck} />
       {Array.from({ length: p.handCount }, (_, i) => (
         <div key={i} data-anchor={`hand-${p.seat}-${i}`} style={placed(handRect(p.seat, i, p.handCount), { zIndex: 2 })}>
           <CardBack deck={p.deck} size={P_CARD} />
         </div>
       ))}
-      <FaceDownPile anchor={`score-${p.seat}`} rect={scoreRect(p.seat)} count={p.scoreCount} deck={p.deck} />
+      <ScorePile seat={p.seat} rect={scoreRect(p.seat)} count={p.scoreCount} top={p.scoreTop} />
       {p.hasDragon && (
         <div data-anchor="dragon" style={placed(dragonRect(p.seat), { zIndex: 3 })}>
           <GreatDragon size={dragonRect(p.seat).w} />
@@ -598,6 +609,13 @@ export function planAnimation(
           fromCap > 0
             ? visible.map((id, i) => ({ id, rect: slotRect(from as Space, i) }))
             : [{ id: visible[visible.length - 1] ?? '', rect: from === 'belowShip' ? belowShipRect() : slotRect(from as Space, 0) }]
+        // Score piles lie face-up: collected cards keep their faces and land on the pile, the stack's
+        // top card last (it becomes the pile's new top). Until then the old top stays in view.
+        const prevSeat = prev.players.find((p) => p.seat === seat)
+        const lands = t + (pieces.length - 1) * STAGGER_MS + COLLECT_FLY
+        if (prevSeat?.scoreTop) {
+          add({ from: to, to, node: <Card id={prevSeat.scoreTop} size={to.w} />, delay: 0, duration: lands, vanishAt: lands, z: 5 })
+        }
         pieces.forEach((pc, i) => {
           const src = pc.id ? source(pc.id, pc.rect, t + i * STAGGER_MS) : { rect: pc.rect, delay: t + i * STAGGER_MS, appear: true, z: undefined }
           const face = pc.id ? <Card id={pc.id} size={to.w} /> : <CardBack deck={prev.players[seat]?.deck ?? 'green'} size={to.w} />
@@ -605,10 +623,9 @@ export function planAnimation(
             {
               from: src.rect,
               to,
-              node: <FlipCard w={to.w} h={to.h} first={face} second={<CardBack deck={next.players[seat]?.deck ?? 'green'} size={to.w} />} />,
+              node: face,
               delay: src.delay,
               duration: COLLECT_FLY,
-              flip: true,
               lift: 80,
               appear: src.appear,
               z: src.z ?? STACK_Z + i,
@@ -616,7 +633,7 @@ export function planAnimation(
             pc.id ? [pc.id] : []
           )
         })
-        if ((prev.players.find((p) => p.seat === seat)?.scoreCount ?? 0) === 0) hidden.push(`score-${seat}`)
+        hidden.push(`score-${seat}`)
         sounds.push({ name: 'collect', at: t })
         phase()
         break

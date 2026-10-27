@@ -4,6 +4,7 @@ import { flightBox, type Rect } from './flyers'
 import {
   BOARD,
   H,
+  P_CARD,
   W,
   ZONE_W,
   belowShipRect,
@@ -62,19 +63,19 @@ describe('board layout (measured from the real board)', () => {
       }
   })
 
-  it('fills capacity spaces back to front, so the newest card is the frontmost and on top', () => {
+  it('fills capacity spaces from the upper-left outline, staggering down-right, each later card on top', () => {
     for (const s of SPACES) {
       const cap = CAPACITY[s]
       if (cap === 0) continue
-      // first card in the back-most (lower-right) outline, the last in the front (top-left) one
-      expect(outlineIndexFor(s, 0)).toBe(cap - 1)
-      expect(outlineIndexFor(s, cap - 1)).toBe(0)
+      // first card in the upper-left outline, the last in the lowest-right one
+      expect(outlineIndexFor(s, 0)).toBe(0)
+      expect(outlineIndexFor(s, cap - 1)).toBe(cap - 1)
       for (let i = 1; i < cap; i++) {
         expect(slotZ(i)).toBeGreaterThan(slotZ(i - 1))
         const newer = slotRect(s, i)
         const older = slotRect(s, i - 1)
-        expect(newer.x).toBeLessThan(older.x)
-        expect(newer.y).toBeLessThan(older.y)
+        expect(newer.x).toBeGreaterThan(older.x)
+        expect(newer.y).toBeGreaterThan(older.y)
       }
     }
   })
@@ -122,11 +123,21 @@ describe('player zones', () => {
   it('fits every piece in its zone without overlapping the board or each other', () => {
     for (const seat of [0, 1]) {
       const z = zoneFor(seat)
-      const pieces = [deckRect(seat), scoreRect(seat), seatDragonRect(seat), ...Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6))]
+      const pieces = [deckRect(seat), scoreRect(seat), ...Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6))]
       for (const r of pieces) {
         expect(inside(r, z, 6)).toBe(true)
         expect(r.y).toBeGreaterThan(BOARD.y + BOARD.h)
       }
+      // A held Great Dragon lies low on the inner side of the hand (right of seat 0's, left of seat 1's),
+      // on open table: on the canvas, clear of the board, the pile below the Ship and the ship stacks.
+      const d = seatDragonRect(seat)
+      const fanR = Math.max(...Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6).x + P_CARD))
+      const fanL = Math.min(...Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6).x))
+      if (seat === 0) expect(d.x).toBeGreaterThanOrEqual(fanR)
+      else expect(d.x + d.w).toBeLessThanOrEqual(fanL)
+      expect(d.y + d.h).toBeLessThanOrEqual(H)
+      expect(d.y).toBeGreaterThan(BOARD.y + BOARD.h)
+      for (const r of [boundsOf(belowShipRect()), shipStackRect(0), shipStackRect(1), shipStackRect(2)]) expect(overlaps(d, r)).toBe(false)
       const fan = Array.from({ length: 6 }, (_, i) => handRect(seat, i, 6))
       const fanBox = { x: Math.min(...fan.map((r) => r.x)), y: fan[0].y, w: Math.max(...fan.map((r) => r.x + r.w)) - Math.min(...fan.map((r) => r.x)), h: fan[0].h }
       expect(overlaps(deckRect(seat), fanBox)).toBe(false)

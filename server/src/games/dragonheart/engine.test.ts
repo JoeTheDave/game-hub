@@ -469,15 +469,24 @@ describe('hidden information', () => {
     return { s, stack }
   }
 
-  it('the table never sees hands, decks, score piles or cards below the top of a stack', () => {
+  it('the table never sees hands, decks, cards below a score pile\'s top or below the top of a stack', () => {
     const { s, stack } = midGame()
+    s.players[0].score.unshift(draw(s, 0, 'dwarf'))
     const json = JSON.stringify(tableView(s, seats))
     const secret = [
-      ...s.players.flatMap((p) => [...p.hand, ...p.deck, ...p.score]),
+      ...s.players.flatMap((p) => [...p.hand, ...p.deck, ...p.score.slice(0, -1)]),
       ...stack.slice(0, -1),
     ]
     for (const id of secret) expect(json).not.toContain(`"${id}"`)
     expect(json).toContain(`"${stack[2]}"`)
+  })
+
+  it('score piles lie face-up: the table shows each pile\'s top card', () => {
+    const { s } = midGame()
+    const tv = tableView(s, seats)
+    expect(tv.players[0].scoreTop).toBe(s.players[0].score.at(-1))
+    expect(tv.players[1].scoreTop).toBe(s.players[1].score.at(-1))
+    expect(tableView(base(), seats).players[0].scoreTop).toBeNull()
   })
 
   it('the table shows each space’s card count and total points, but still only the top card of a stack', () => {
@@ -497,7 +506,11 @@ describe('hidden information', () => {
     expect(v.hand).toEqual(s.players[0].hand)
     expect(v.scorePile).toEqual(s.players[0].score)
     const json = JSON.stringify(v)
-    for (const id of [...s.players[1].hand, ...s.players[1].score, ...s.players[1].deck, ...s.players[0].deck]) {
+    s.players[1].score.unshift(draw(s, 1, 'dwarf'))
+    const v2 = JSON.stringify(playerView(s, 0, seats))
+    expect(v2).toContain(`"${s.players[1].score.at(-1)}"`) // the opponent's face-up top card is public
+    for (const id of [...s.players[1].score.slice(0, -1)]) expect(v2).not.toContain(`"${id}"`)
+    for (const id of [...s.players[1].hand, ...s.players[1].deck, ...s.players[0].deck]) {
       expect(json).not.toContain(`"${id}"`)
     }
   })

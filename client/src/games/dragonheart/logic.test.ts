@@ -105,4 +105,16 @@ describe('handGrid', () => {
       }
     }
   })
+
+  it('keeps a landscape hand in one row however much room the action bar leaves', () => {
+    // Before a tap (tall hand area) and after (the action bar takes height): still one row of 6.
+    for (const h of [420, 300, 180, 120]) {
+      const g = handGrid(820, h, 6, 336 / 220, 10, true)
+      expect(g.rows).toBe(1)
+      expect(g.cols).toBe(6)
+      expect(g.cardW * (336 / 220)).toBeLessThanOrEqual(h + 0.5)
+    }
+    // Portrait may still use more rows.
+    expect(handGrid(360, 520, 6, 336 / 220, 10, false).rows).toBeGreaterThan(1)
+  })
 })

@@ -82,10 +82,16 @@ export function choiceLabel(o: PlayOption): string {
   return target ? `Take ${SOURCE_NAME(target)}${c ? ` (${c.count})` : ''}` : 'Play'
 }
 
-/** Biggest hand-card width that fits `n` cards in a w×h area (tries 1–3 rows). */
-export function handGrid(w: number, h: number, n: number, ratio: number, gap = 8) {
+/**
+ * Biggest hand-card width that fits `n` cards in a w×h area. The row count is fixed by the phone's
+ * orientation, never by the momentary space: in landscape the hand is always ONE row (cards shrink
+ * to fit), so showing the action bar after a tap can't reflow it into 2×3 (Joe, iteration 3).
+ * In portrait it may use up to 3 rows.
+ */
+export function handGrid(w: number, h: number, n: number, ratio: number, gap = 8, landscape = false) {
   let best = { cols: Math.max(1, n), rows: 1, cardW: 0 }
-  for (let rows = 1; rows <= 3; rows++) {
+  const maxRows = landscape ? 1 : 3
+  for (let rows = 1; rows <= maxRows; rows++) {
     const cols = Math.max(1, Math.ceil(n / rows))
     const byW = (w - gap * (cols - 1)) / cols
     const byH = (h - gap * (rows - 1)) / rows / ratio

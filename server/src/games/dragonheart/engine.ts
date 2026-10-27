@@ -463,6 +463,11 @@ export interface PublicPlayer {
   handCount: number
   deckCount: number
   scoreCount: number
+  /**
+   * The top card of the score pile. Score piles lie face-up on the table (Joe, spec 1793038854620
+   * iteration 3), so the top card is public; cards beneath it stay hidden until the game ends.
+   */
+  scoreTop: CardId | null
   handMax: number
   hasDragon: boolean
 }
@@ -537,6 +542,7 @@ export function tableView(s: DragonheartState, players: SeatInfo[]): Dragonheart
       handCount: p.hand.length,
       deckCount: p.deck.length,
       scoreCount: p.score.length,
+      scoreTop: p.score.length > 0 ? p.score[p.score.length - 1] : null,
       handMax: handMax(s, i as Seat),
       hasDragon: s.greatDragon === i,
     })),

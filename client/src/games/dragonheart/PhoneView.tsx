@@ -10,15 +10,19 @@ import './dragonheart.css'
 
 function useSize<T extends HTMLElement>() {
   const ref = useRef<T>(null)
-  const [size, setSize] = useState({ w: 0, h: 0 })
+  const [size, setSize] = useState({ w: 0, h: 0, landscape: false })
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight, landscape: window.innerWidth > window.innerHeight })
     update()
     const ro = new ResizeObserver(update)
     ro.observe(el)
-    return () => ro.disconnect()
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
   }, [])
   return [ref, size] as const
 }
@@ -151,7 +155,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
 function Hand({ view, selected, canAct, onTap }: { view: DragonheartPlayerView; selected: string[]; canAct: boolean; onTap: (id: string) => void }) {
   const [ref, size] = useSize<HTMLDivElement>()
   const n = Math.max(1, view.hand.length)
-  const grid = handGrid(size.w, size.h, n, CARD_RATIO, 10)
+  const grid = handGrid(size.w, size.h, n, CARD_RATIO, 10, size.landscape)
   const options = canAct ? view.options : []
   return (
     <div ref={ref} className="flex-1 min-h-0 mx-3 my-2 flex items-center justify-center">

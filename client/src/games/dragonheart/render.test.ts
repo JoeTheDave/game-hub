@@ -65,9 +65,9 @@ describe('dragonheart views render', () => {
 })
 
 describe('stack notes', () => {
-  it('shows a subtle "count · points" only for 2 or more cards', () => {
-    expect(noteText(3, 7)).toBe('3 · 7')
-    expect(noteText(2, 0)).toBe('2 · 0')
+  it('shows a subtle "N pts" (points only) for 2 or more cards', () => {
+    expect(noteText(3, 7)).toBe('7 pts')
+    expect(noteText(2, 0)).toBe('0 pts')
     expect(noteText(1, 4)).toBeNull()
     expect(noteText(0, 0)).toBeNull()
   })

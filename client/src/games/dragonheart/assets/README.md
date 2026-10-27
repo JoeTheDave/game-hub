@@ -71,3 +71,18 @@ The petrified, ship, back, panorama and figure assets were each picked from 3–
 - **Reproduce:** `python3 tools/dragonheart-art/clip_cards.py "<Board - Joe v2.png>" --check /tmp/out`. It rewrites the panorama and the 9 card faces, and with `--check` draws every measured outline (front red, back green) and the Great Dragon start spot for eyeballing.
 - **Great Dragon:** `figure/great-dragon.webp` (the 3D figure) is removed. The token is now a flat SVG medallion in `components.tsx`.
 - **Superseded:** the iteration 1 img2img board and card art below.
+
+## Iteration 3 (2026-10-27)
+
+### Card frame: `frame/frame.webp` + `frame/frame.json`
+The original cards' artistic border, derived from the scanned Troll card (vault `Card Scans/Card Faces - All Types.jpg`) by `tools/dragonheart-art/make_frame.py`:
+1. Straighten the card (4.3°) and crop it.
+2. Resize to 660×1008, the outline ratio 336:220. The real card is 1.537:1, so the squash is under 1%.
+3. Erase the printed numerals from the four corner cartouches (diffusion inpaint).
+4. Cut the art window to transparent. The cartouches and the silver dragon pixels overlapping the window edge are kept; leftover warm paint is removed.
+5. Round the outer corners.
+
+`frame.json` holds the window and cartouche rects as fractions of the card. The React `Card` puts the board-clipped art (`cards/*.webp`, zoomed 7% past its painted outline) in the window, and the point values (Cinzel, white with a dark outline; bottom pair rotated 180°) in the cartouches. Ships show the bow-and-sword glyph there.
+
+### Great Dragon token: `token/great-dragon.webp`
+Joe's own token art (a silver coin with a dragon head and a key-pattern rim; supplied in the thread 2026-10-27, also copied to vault `Board Art/Dragon Token - Joe.png`), trimmed to its bounding box and resized to 400×400 with alpha. It replaces the SVG medallion.

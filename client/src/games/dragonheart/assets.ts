@@ -11,5 +11,7 @@ export const SOUNDS = urls(import.meta.glob('./assets/sounds/*.mp3', { eager: tr
 /** The repainted card backs, one per deck colour. */
 export const BACK_IMG = { green: GREEN_BACK, red: RED_BACK } as const
 
+export { default as FRAME_IMG } from './assets/frame/frame.webp'
+export { default as TOKEN_IMG } from './assets/token/great-dragon.webp'
 export { default as BOARD_IMG } from './assets/board/panorama.webp'
 export { default as TABLE_IMG } from './assets/table/surface.webp'

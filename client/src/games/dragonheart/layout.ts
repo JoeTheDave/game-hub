@@ -62,14 +62,14 @@ export function outlineRect(space: Space | 'belowShip', i = 0): NRect {
 
 /**
  * Which outline the `i`-th card on a space (in play order, 0 = first played) lies in. Capacity
- * spaces fill BACK to FRONT: the first card takes the back-most (lower-right) outline and each
- * newer card the next one forward, so the newest card is always the frontmost, on top. Stack
- * spaces have a single outline.
+ * spaces fill from the UPPER-LEFT outline (index 0 in boardGeometry.json) and stagger down and to
+ * the right; each later card lies on top of the earlier ones (Joe, iteration 3), so the newest card
+ * is always on top. Stack spaces have a single outline.
  */
 export function outlineIndexFor(space: Space, i: number): number {
   const cap = CAPACITY[space]
   if (cap <= 0) return 0
-  return Math.max(0, cap - 1 - Math.min(i, cap - 1))
+  return Math.max(0, Math.min(i, cap - 1))
 }
 
 /** The card rect for the `i`-th card (play order) on a space; it fills its outline exactly. */
@@ -144,7 +144,8 @@ export const FAN_STEP = 30
 const FAN_W = P_CARD + 5 * FAN_STEP
 const NAME_ROW = 58
 const NAME_GAP = 12
-export const DRAGON_SEAT_SIZE = 100
+export const DRAGON_SEAT_SIZE = 120
+const DRAGON_GAP = 24
 
 /**
  * Inside a zone: the name card across the top; below it the piles column (draw deck over score
@@ -172,10 +173,13 @@ export function spotLayout(zone: Zone, seat = 0) {
     fanX,
     deck: { x: pilesX, y: cardsY, w: PILE_CARD, h: PILE_CARD_H } as Rect,
     score: { x: pilesX, y: cardsY + PILE_CARD_H + PILE_GAP, w: PILE_CARD, h: PILE_CARD_H } as Rect,
-    /** The Great Dragon token sits at the inner end of the name row, half over the hand. */
+    /**
+     * A held Great Dragon lies low on the table on the inner side of the hand: right of seat 0's
+     * hand, left of seat 1's (Joe, iteration 3), bottom-aligned with the hand.
+     */
     dragon: {
-      x: innerRight ? left + contentW - DRAGON_SEAT_SIZE : left,
-      y: top + NAME_ROW / 2 - DRAGON_SEAT_SIZE / 2 + 6,
+      x: innerRight ? fanX + FAN_W + DRAGON_GAP : fanX - DRAGON_GAP - DRAGON_SEAT_SIZE,
+      y: cardsY + P_CARD_H - DRAGON_SEAT_SIZE,
       w: DRAGON_SEAT_SIZE,
       h: DRAGON_SEAT_SIZE,
     } as Rect,
@@ -218,7 +222,7 @@ export function glowRect(seat: number) {
   return { x: s.left - 40, y: s.top - 30, w: s.contentW + 80, h: Math.min(z.h + 20, s.contentH + 60) }
 }
 
-// ——— Stack notes: an extremely subtle "count · points" under the top card, only for 2+ cards ———
+// ——— Stack notes: a subtle "N pts" under the top card, only for 2+ cards ———
 /**
  * Where a space's note sits: centred just inside the bottom edge of its top (newest) card, between
  * the corner value squares. `count` is the number of cards on the space.
