@@ -64,6 +64,8 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
   const [flyers, setFlyers] = useState<Flyer[]>([])
   const [hidden, setHidden] = useState<string[]>([])
   const [glowTurn, setGlowTurn] = useState(view.turn)
+  // The points notes show the table as it was until the update's flights have landed.
+  const [notesView, setNotesView] = useState(view)
   const reduced = useMemo(prefersReducedMotion, [])
   const timerRef = useRef<number | null>(null)
   // Decode every card image before the first flight, so fresh copies never paint empty (gray).
@@ -90,6 +92,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
       setFlyers([])
       setHidden([])
       setGlowTurn(view.turn)
+      setNotesView(view)
       onEventsDone()
       return
     }
@@ -97,12 +100,15 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
     for (const s of plan.sounds) sound.play(s.name, { delayMs: s.at, volume: (s.volume ?? 1) * SOUND_GAIN })
     setFlyers(plan.flyers)
     setHidden(plan.hidden)
+    setNotesView(prev)
     const turn = view.turn
+    const landed = view
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
       setFlyers([])
       setHidden([])
       setGlowTurn(turn)
+      setNotesView(landed)
       onEventsDone()
     }, plan.total + 60)
   })
@@ -145,7 +151,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         <PileBelowShip view={view} />
 
         {/* A subtle "N pts" under each space holding 2+ cards */}
-        <StackNotes view={view} />
+        <StackNotes view={notesView} />
 
         {/* Ship stacks beside it (the third one ends the game) */}
         {view.shipStacks.map((stack, i) => {
@@ -270,7 +276,8 @@ function PileBelowShip({ view }: { view: DragonheartTableView }) {
 
 /** The subtle note for a space: its total points ("7 pts"), only when it holds 2 or more cards. */
 export function noteText(count: number, points: number): string | null {
-  if (count < 2) return null
+  // Only for a real pile, and never "0 pts" (ships are worth nothing).
+  if (count < 2 || points <= 0) return null
   return `${points} pts`
 }
 
