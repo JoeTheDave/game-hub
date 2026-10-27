@@ -1,7 +1,7 @@
 import type { ClientGameModule } from '../types'
 import { TableView } from './TableView'
 import { PhoneView } from './PhoneView'
-import { SOUNDS } from './assets'
+import { SOUNDS, preloadImages } from './assets'
 
 const dragonheart: ClientGameModule = {
   slug: 'dragonheart',
@@ -9,6 +9,7 @@ const dragonheart: ClientGameModule = {
   PhoneView,
   prepareTable(sound) {
     sound.registerFiles(SOUNDS)
+    void preloadImages()
   },
 }
 

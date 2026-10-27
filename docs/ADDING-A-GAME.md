@@ -108,6 +108,11 @@ These are Joe's standing preferences, learned the hard way on Splendor:
   - Moving and flipping happen as **one fluid motion along a straight path** that lands exactly in the slot.
   - Keep the geometry in a pure function and unit-test that frames never leave the source/destination envelope. Two real bugs came from this: pieces landing one slot over, and pieces dipping a card-height low.
 - **Pace:** about 600–900 ms per motion with a gentle ease-out (`cubic-bezier(.22,.8,.3,1)`) and about 90 ms stagger. A whole turn takes ≤ 2.5 s. "Slow enough to see, fast enough not to annoy." The phones never wait for the TV.
+- **Never let an unpainted piece show as a box:**
+  - Decode every piece image up front (`preloadImages()` in the game's `assets.ts`, called from `prepareTable` and on TV mount) and use `decoding="sync"` on piece images, so freshly rendered flight copies paint immediately.
+  - Draw stack-thickness edges as thin clipped slivers, never full card-sized boxes.
+  - Hide a pile's edges and top card together.
+  - (Dragonheart: slower TV browsers showed gray boxes at flight destinations.)
 - **The TV must update immediately** when a move arrives. The feed queue advances as soon as the previous animation has finished (see `client/src/lib/tableQueue.ts`).
 - **Sound:**
   - Short, soft and natural: about −12 dBFS, rounded attacks, low-passed, played at about half gain.

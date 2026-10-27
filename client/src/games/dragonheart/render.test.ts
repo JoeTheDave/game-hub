@@ -227,3 +227,13 @@ describe('piles hide as a unit during flights (no gray box at the destination)',
     }
   })
 })
+
+describe('stack edges can never read as a gray box', () => {
+  it('clips every edge layer to the thin sliver that peeks out under the card above', async () => {
+    const { StackEdges } = await import('./components')
+    const html = renderToString(createElement(StackEdges, { count: 15, size: 120, face: 'up' }))
+    const layers = html.match(/data-edge-layer/g) ?? []
+    expect(layers.length).toBeGreaterThan(0)
+    expect((html.match(/clip-path:polygon\(/g) ?? []).length).toBe(layers.length)
+  })
+})

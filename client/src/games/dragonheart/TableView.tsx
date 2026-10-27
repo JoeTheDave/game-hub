@@ -26,7 +26,7 @@ import {
   spotLayout,
   zoneFor,
 } from './layout'
-import { BOARD_IMG, TABLE_IMG } from './assets'
+import { BOARD_IMG, TABLE_IMG, preloadImages } from './assets'
 import './dragonheart.css'
 
 function useStageScale() {
@@ -66,6 +66,10 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
   const [glowTurn, setGlowTurn] = useState(view.turn)
   const reduced = useMemo(prefersReducedMotion, [])
   const timerRef = useRef<number | null>(null)
+  // Decode every card image before the first flight, so fresh copies never paint empty (gray).
+  useEffect(() => {
+    void preloadImages()
+  }, [])
   useEffect(
     () => () => {
       if (timerRef.current != null) window.clearTimeout(timerRef.current)

@@ -126,9 +126,10 @@ export function Card({ id, size, height, style }: { id: string; size: number; he
         src={CARD_IMG[kind]}
         alt=""
         draggable={false}
+        decoding="sync"
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }}
       />
-      <img src={FRAME_IMG} alt="" draggable={false} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2 }} />
+      <img src={FRAME_IMG} alt="" draggable={false} decoding="sync" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 2 }} />
       <Cartouche points={pts} kind={kind} at="tl" />
       <Cartouche points={pts} kind={kind} at="tr" />
       <Cartouche points={pts} kind={kind} at="bl" />
@@ -167,6 +168,7 @@ export function CardBack({ deck, size, height, style }: { deck: DeckColor; size:
           src={BACK_IMG[deck]}
           alt=""
           draggable={false}
+          decoding="sync"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </div>
@@ -191,22 +193,29 @@ export function GreatDragon({ size, style }: { size: number; style?: CSSProperti
 /** Silver card edges under a stack's top card: thickness hints at size, never a number. */
 export function StackEdges({ count, size, face }: { count: number; size: number; face: 'up' | 'down' }) {
   const layers = Math.min(5, Math.ceil(count / (face === 'up' ? 3 : 6)))
+  const w = size
+  const h = size * CARD_RATIO
   return (
     <>
       {Array.from({ length: layers }, (_, i) => {
         const off = (layers - i) * 2.2
+        // Visible region of a layer offset by `off` under the card: a thin L along its right and
+        // bottom edges. Clipping to it means bare edges never show as a full gray card box.
+        const clip = `polygon(${w - off}px 0, ${w}px 0, ${w}px ${h}px, 0 ${h}px, 0 ${h - off}px, ${w - off}px ${h - off}px)`
         return (
           <div
             key={i}
+            data-edge-layer=""
             style={{
               position: 'absolute',
               left: off,
               top: off,
-              width: size,
-              height: size * CARD_RATIO,
+              width: w,
+              height: h,
               borderRadius: size * 0.06,
               background: 'linear-gradient(160deg, #cfcbc4, #a9a49b)',
               boxShadow: '0 1px 2px rgba(0,0,0,.45)',
+              clipPath: clip,
             }}
           />
         )
