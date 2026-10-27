@@ -229,13 +229,8 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
   const top = sv.visible[sv.visible.length - 1]
   if (sv.count === 0) return null
   return (
-    <div style={placed(local(r), { zIndex: 2 })}>
-      <StackEdges count={sv.count - 1} size={r.w} face="up" />
-      {top && (
-        <div data-anchor={`top-${space}`} style={{ position: 'absolute', inset: 0 }}>
-          <Card id={top} size={r.w} height={r.h} />
-        </div>
-      )}
+    <div data-anchor={`top-${space}`} style={placed(local(r), { zIndex: 2 })}>
+      <PileFace top={top} count={sv.count} w={r.w} h={r.h} />
     </div>
   )
 }
@@ -261,13 +256,8 @@ function PileBelowShip({ view }: { view: DragonheartTableView }) {
         }}
       />
       {view.belowShip.count > 0 && (
-        <div style={placed(r, { zIndex: 2 })}>
-          <StackEdges count={view.belowShip.count - 1} size={r.w} face="up" />
-          {top && (
-            <div data-anchor="belowShip" style={{ position: 'absolute', inset: 0 }}>
-              <Card id={top} size={r.w} height={r.h} />
-            </div>
-          )}
+        <div data-anchor="belowShip" style={placed(r, { zIndex: 2 })}>
+          <PileFace top={top} count={view.belowShip.count} w={r.w} h={r.h} />
         </div>
       )}
     </>
@@ -358,6 +348,19 @@ function TurnGlow({ rect, on }: { rect: { x: number; y: number; w: number; h: nu
   )
 }
 
+/**
+ * A face-up pile: silver edges for thickness, plus the top card. Always rendered (and hidden) as
+ * one unit. If only the top were hidden during a flight, the bare edges would show as a gray box.
+ */
+export function PileFace({ top, count, w, h }: { top: string | null | undefined; count: number; w: number; h: number }) {
+  return (
+    <>
+      <StackEdges count={Math.max(0, count - 1)} size={w} face="up" />
+      {top && <Card id={top} size={w} height={h} style={{ position: 'absolute', inset: 0 }} />}
+    </>
+  )
+}
+
 /** A face-down pile (draw deck or score pile): thickness hints at its size, never a number. */
 function FaceDownPile({ anchor, rect, count, deck }: { anchor: string; rect: Rect; count: number; deck: DeckColor }) {
   if (count <= 0) {
@@ -381,8 +384,7 @@ function ScorePile({ seat, rect, count, top }: { seat: number; rect: Rect; count
   }
   return (
     <div data-anchor={`score-${seat}`} style={placed(rect)}>
-      <StackEdges count={count - 1} size={rect.w} face="up" />
-      <Card id={top} size={rect.w} height={rect.h} style={{ position: 'absolute', inset: 0 }} />
+      <PileFace top={top} count={count} w={rect.w} h={rect.h} />
     </div>
   )
 }
@@ -573,7 +575,7 @@ export function planAnimation(
         if (prevTop) {
           const r = slotRect(space, 0)
           const lands = t + (ids.length - 1) * STAGGER_MS + CARD_FLY
-          add({ from: r, to: r, node: <Card id={prevTop} size={r.w} height={r.h} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z + before - 1 })
+          add({ from: r, to: r, node: <PileFace top={prevTop} count={before} w={r.w} h={r.h} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z + before - 1 })
         }
         ids.forEach((id, j) => {
           const from = handRect(seat, Math.max(0, n0 - ids.length + j), n0)
@@ -614,7 +616,7 @@ export function planAnimation(
         const prevSeat = prev.players.find((p) => p.seat === seat)
         const lands = t + (pieces.length - 1) * STAGGER_MS + COLLECT_FLY
         if (prevSeat?.scoreTop) {
-          add({ from: to, to, node: <Card id={prevSeat.scoreTop} size={to.w} height={to.h} />, delay: 0, duration: lands, vanishAt: lands, z: 5 })
+          add({ from: to, to, node: <PileFace top={prevSeat.scoreTop} count={prevSeat.scoreCount} w={to.w} h={to.h} />, delay: 0, duration: lands, vanishAt: lands, z: 5 })
         }
         pieces.forEach((pc, i) => {
           const src = pc.id ? source(pc.id, pc.rect, t + i * STAGGER_MS) : { rect: pc.rect, delay: t + i * STAGGER_MS, appear: true, z: undefined }
@@ -661,6 +663,13 @@ export function planAnimation(
         const from = e.from as Space
         const ids = e.cardIds as string[]
         const to = belowShipRect()
+        // The pile already below the Ship stays in view (with its edges) until the new cards land on it.
+        const prevPile = prev.belowShip
+        const prevPileTop = prevPile.visible[prevPile.visible.length - 1]
+        if (prevPileTop) {
+          const lands = t + (ids.length - 1) * STAGGER_MS + CARD_FLY
+          add({ from: to, to, node: <PileFace top={prevPileTop} count={prevPile.count} w={to.w} h={to.h} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z - 1 })
+        }
         ids.forEach((id, i) => {
           const src = source(id, slotRect(from, i), t + i * STAGGER_MS)
           add({ from: src.rect, to, node: <Card id={id} size={to.w} height={to.h} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])

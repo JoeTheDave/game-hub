@@ -195,3 +195,35 @@ describe('animation planning', () => {
     for (const t of ['cardsPlayed', 'cardsCollected', 'cardsDrawn', 'movedBelowShip', 'shipStackFormed', 'greatDragonMoved']) expect(seen.has(t)).toBe(true)
   })
 })
+
+describe('piles hide as a unit during flights (no gray box at the destination)', () => {
+  it('puts the silver edges inside the hidden anchor for every face-up pile', () => {
+    // Find a state where some board stack and a score pile hold 2+ cards.
+    let found: DragonheartState | null = null
+    play(7, (_p, next) => {
+      if (found) return
+      const stackFull = (['treasure', 'fireDragon', 'petrified', 'sorceress', 'troll'] as const).some((s) => next.spaces[s].length >= 2)
+      if (stackFull && next.players.some((p) => p.score.length >= 2)) found = next
+    })
+    expect(found).not.toBeNull()
+    const view = tableView(found!, seats)
+    const html = renderToString(
+      createElement(TableView, { instance, view, players: [], events: [], seq: 1, onEventsDone: noop, sound } as never)
+    )
+    // Each pile anchor must wrap its edge layers: hiding it via [data-anchor=…]{visibility:hidden}
+    // then hides the edges too, instead of leaving them as a bare gray box.
+    const anchors = [...html.matchAll(/data-anchor="(top-[a-zA-Z]+|score-\d|belowShip)"/g)].map((m) => m[1])
+    expect(anchors.length).toBeGreaterThan(0)
+    for (const a of anchors) {
+      const start = html.indexOf(`data-anchor="${a}"`)
+      const chunk = html.slice(start, start + 4000)
+      const firstCardImg = chunk.indexOf('<img')
+      const edge = chunk.indexOf('linear-gradient(160deg')
+      const count = a.startsWith('top-') ? view.spaces[a.slice(4) as keyof typeof view.spaces].count : a === 'belowShip' ? view.belowShip.count : view.players[Number(a.slice(6))].scoreCount
+      if (count >= 2) {
+        expect(edge, `${a} edges inside its anchor`).toBeGreaterThan(-1)
+        expect(edge, `${a} edges before the top card`).toBeLessThan(firstCardImg === -1 ? Infinity : firstCardImg)
+      }
+    }
+  })
+})
