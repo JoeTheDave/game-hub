@@ -102,3 +102,35 @@ export function handGrid(w: number, h: number, n: number, ratio: number, gap = 8
   }
   return best
 }
+
+
+// ——— Series across rematches (match history) ———
+
+export interface SeriesSummary {
+  /** One entry per completed game, oldest first. */
+  games: { scores: number[]; winners: number[] }[]
+  /** Cumulative score per seat (index = seat). */
+  totals: number[]
+  /** Seats with the highest cumulative score (2 = tied). */
+  leaders: number[]
+  /** One line, e.g. "Jeff leads the series · 215 to 180" or "Series tied · 120 to 120". */
+  line: string
+}
+
+/** The series so far, or null unless at least two games have been completed. */
+export function seriesSummary(
+  history: { scores: number[]; winners: number[] }[] | undefined,
+  players: { seat: number; name: string }[]
+): SeriesSummary | null {
+  if (!history || history.length < 2) return null
+  const seats = players.map((p) => p.seat)
+  const totals: number[] = []
+  for (const seat of seats) totals[seat] = history.reduce((sum, g) => sum + (g.scores[seat] ?? 0), 0)
+  const best = Math.max(...seats.map((s) => totals[s]))
+  const leaders = seats.filter((s) => totals[s] === best)
+  const ordered = seats.slice().sort((a, b) => totals[b] - totals[a])
+  const score = ordered.map((s) => totals[s]).join(' to ')
+  const name = (seat: number) => players.find((p) => p.seat === seat)?.name ?? `Player ${seat + 1}`
+  const line = leaders.length === 1 ? `${name(leaders[0])} leads the series · ${score}` : `Series tied · ${score}`
+  return { games: history, totals, leaders, line }
+}

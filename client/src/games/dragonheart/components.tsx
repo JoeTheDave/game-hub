@@ -256,3 +256,125 @@ export function kindOf(id: string): Kind {
 export function deckOf(id: string): DeckColor {
   return CARD_BY_ID[id]?.deck ?? 'green'
 }
+
+// ——— Series table (match history across rematches) ———
+
+/** A small gold laurel wreath: marks the overall series leader. */
+export function Laurel({ size = 28, title = 'Series leader' }: { size?: number; title?: string }) {
+  const leaves = [0, 1, 2, 3, 4]
+  return (
+    <svg data-laurel="" width={size} height={size} viewBox="0 0 40 40" role="img" aria-label={title} style={{ flexShrink: 0, display: 'inline-block', verticalAlign: 'middle' }}>
+      <title>{title}</title>
+      <g fill="#c9971f" stroke="#7a5a12" strokeWidth={0.8}>
+        {[-1, 1].map((side) => (
+          <g key={side} transform={side < 0 ? undefined : 'translate(40 0) scale(-1 1)'}>
+            <path d="M20 35 C 9 31, 5 21, 9 8" fill="none" stroke="#9a7317" strokeWidth={1.8} />
+            {leaves.map((i) => {
+              const t = i / 4
+              const x = 20 - 11 * Math.sin(t * 1.9) - 2
+              const y = 33 - t * 25
+              return <ellipse key={i} cx={x - 2.5} cy={y} rx={4.2} ry={2} transform={`rotate(${-55 + t * 40} ${x - 2.5} ${y})`} />
+            })}
+          </g>
+        ))}
+        <circle cx={20} cy={34.5} r={2} fill="#a32020" stroke="#5c1010" />
+      </g>
+    </svg>
+  )
+}
+
+export interface SeriesTableProps {
+  series: { games: { scores: number[]; winners: number[] }[]; totals: number[]; leaders: number[]; line: string }
+  players: { seat: number; name: string; deck: DeckColor }[]
+  variant: 'tv' | 'phone'
+}
+
+const GOLD = '#a8780e'
+const deckHex = (d: DeckColor) => (d === 'green' ? '#2f8a3a' : '#a32020')
+
+/**
+ * Every game of the series as a column (G1, G2, …) plus a Total column; each game's winning score
+ * is gold and the overall leader gets a laurel. The TV shows the most recent games (older ones fold
+ * into one "Earlier" column); the phone scrolls the game columns sideways inside the table while
+ * names and Total stay pinned.
+ */
+export function SeriesTable({ series, players, variant }: SeriesTableProps) {
+  const tv = variant === 'tv'
+  const MAX_TV_GAMES = 10
+  const all = series.games.map((g, i) => ({ label: `G${i + 1}`, scores: g.scores, winners: g.winners }))
+  let cols = all
+  if (tv && all.length > MAX_TV_GAMES) {
+    // Fold the oldest games into one column of per-seat sums so the TV panel keeps its width.
+    const older = all.slice(0, all.length - MAX_TV_GAMES + 1)
+    const sums: number[] = []
+    for (const p of players) sums[p.seat] = older.reduce((sum, g) => sum + (g.scores[p.seat] ?? 0), 0)
+    cols = [{ label: `G1–${older.length}`, scores: sums, winners: [] as number[] }, ...all.slice(older.length)]
+  }
+  const fs = tv ? 24 : 15
+  const cell: CSSProperties = { padding: tv ? '6px 12px' : '6px 8px', textAlign: 'center', whiteSpace: 'nowrap' }
+  const pin = (side: 'left' | 'right'): CSSProperties =>
+    tv ? {} : { position: 'sticky', [side]: 0, zIndex: 1, background: '#efe2c2' }
+  return (
+    <div data-series="" style={{ marginTop: tv ? 22 : 4, color: '#3b2412', width: '100%' }}>
+      {/* An engraved divider and heading, matching the Final Score panel */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: tv ? '0 0 8px' : '0 0 4px' }}>
+        <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #9a7a4a)' }} />
+        <span className="dh-serif" style={{ fontSize: tv ? 22 : 13, letterSpacing: '0.08em' }}>
+          Series · {series.games.length} games
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #9a7a4a, transparent)' }} />
+      </div>
+      <div style={{ overflowX: tv ? 'visible' : 'auto', borderRadius: 8, background: tv ? 'rgba(255,255,255,.28)' : '#efe2c2', boxShadow: 'inset 0 0 0 1px rgba(122,90,40,.35)' }}>
+        <table className="dh-serif" style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: fs, width: tv ? '100%' : 'max-content', minWidth: '100%' }}>
+          <thead>
+            <tr style={{ fontSize: tv ? 17 : 11, letterSpacing: '0.06em', color: '#6b4a26' }}>
+              <th style={{ ...cell, ...pin('left'), textAlign: 'left' }} />
+              {cols.map((c) => (
+                <th key={c.label} style={cell}>
+                  {c.label}
+                </th>
+              ))}
+              <th style={{ ...cell, ...pin('right'), background: tv ? 'rgba(122,90,40,.14)' : '#e6d4ab', borderLeft: '1px solid rgba(122,90,40,.35)' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((p) => {
+              const leads = series.leaders.length === 1 && series.leaders[0] === p.seat
+              return (
+                <tr key={p.seat} style={{ borderTop: '1px solid rgba(122,90,40,.2)' }}>
+                  <td style={{ ...cell, ...pin('left'), textAlign: 'left' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: tv ? 10 : 6, maxWidth: tv ? 260 : 96 }}>
+                      <span style={{ width: tv ? 14 : 9, height: tv ? 14 : 9, borderRadius: 2, flexShrink: 0, background: deckHex(p.deck) }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                    </span>
+                  </td>
+                  {cols.map((c) => {
+                    const won = c.winners.includes(p.seat)
+                    return (
+                      <td key={c.label} data-game-won={won ? '' : undefined} className="dh-numeral" style={{ ...cell, color: won ? GOLD : 'rgba(59,36,18,.75)', fontWeight: won ? 800 : 600, textShadow: won ? '0 0 6px rgba(201,151,31,.35)' : 'none' }}>
+                        {c.scores[p.seat] ?? 0}
+                      </td>
+                    )
+                  })}
+                  <td
+                    data-total=""
+                    className="dh-numeral"
+                    style={{ ...cell, ...pin('right'), fontSize: tv ? 30 : 18, fontWeight: 800, background: tv ? 'rgba(122,90,40,.14)' : '#e6d4ab', borderLeft: '1px solid rgba(122,90,40,.35)', color: leads ? GOLD : '#3b2412' }}
+                  >
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      {series.totals[p.seat] ?? 0}
+                      {leads && <Laurel size={tv ? 30 : 18} />}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div data-series-line="" className="dh-serif" style={{ textAlign: 'center', fontStyle: 'italic', fontSize: tv ? 20 : 12, marginTop: tv ? 10 : 6, color: '#5a3a1c' }}>
+        {series.line}
+      </div>
+    </div>
+  )
+}

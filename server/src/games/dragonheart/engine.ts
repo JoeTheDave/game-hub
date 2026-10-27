@@ -596,4 +596,6 @@ export const dragonheartModule: GameModule<DragonheartState, DragonheartAction> 
   activeSeats: (s) => (s.result ? [] : [s.turn]),
   legalActions,
   winners: (s) => (s.result ? s.result.winners.slice() : []),
+  // Final scores already include the Great Dragon's +3.
+  summary: (s) => (s.result ? { scores: s.result.scores.slice(), winners: s.result.winners.slice() } : null),
 }

@@ -277,3 +277,66 @@ describe('phone layout stays put', () => {
     if (holder === null) expect(phone(s, 0)).not.toMatch(/>\+3</)
   })
 })
+
+describe('series table on the end screen', () => {
+  function finished(seed: number) {
+    const snaps = play(seed)
+    return snaps[snaps.length - 1]
+  }
+  const history2 = [
+    { scores: [72, 43], winners: [0] },
+    { scores: [40, 61], winners: [1] },
+  ]
+
+  it('shows only once a series has two or more games (TV and phone)', () => {
+    const st = finished(3)
+    expect(dragonheartModule.isFinished(st)).toBe(true)
+    const tv = tableView(st, seats)
+    const one = renderToString(createElement(TableView, { instance: { ...instance, history: [history2[0]] }, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound } as never))
+    expect(one).not.toContain('data-series')
+    const two = renderToString(createElement(TableView, { instance: { ...instance, history: history2 }, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound } as never))
+    expect(two).toContain('data-series')
+    expect(two.replace(/<!-- -->/g, '')).toContain('Series · 2 games')
+    // The current match still shows its winner's crown and its own scores.
+    expect(two).toContain('data-crown-cell')
+    const pv = dragonheartModule.playerView(st, 0, seats)
+    const phone = renderToString(
+      createElement(PhoneView, { instance: { ...instance, history: history2 }, view: pv, playerOrder: 0, me: null, players: [], sendAction: async () => true, pending: false, error: null, clearError: noop } as never)
+    )
+    expect(phone).toContain('data-series')
+  })
+
+  it('highlights each game\'s winner, totals the series and crowns the overall leader', async () => {
+    const { SeriesTable } = await import('./components')
+    const { seriesSummary } = await import('./logic')
+    const players = [
+      { seat: 0, name: 'Jeff', deck: 'green' as const },
+      { seat: 1, name: 'James', deck: 'red' as const },
+    ]
+    const games = [...history2, { scores: [55, 50], winners: [0] }]
+    const html = renderToString(createElement(SeriesTable, { series: seriesSummary(games, players)!, players, variant: 'phone' }))
+    expect((html.match(/data-game-won/g) ?? []).length).toBe(3) // one winning score per game
+    expect(html).toContain('>167<')
+    expect(html).toContain('>154<')
+    expect((html.match(/data-laurel/g) ?? []).length).toBe(1)
+    expect(html).toContain('Jeff leads the series · 167 to 154')
+    // Tied: no laurel, and the line says so.
+    const tied = renderToString(createElement(SeriesTable, { series: seriesSummary(history2.map((g) => ({ ...g, scores: [g.scores[1], g.scores[0]] })).concat(history2), players)!, players, variant: 'tv' }))
+    expect(tied).not.toContain('data-laurel')
+    expect(tied).toContain('Series tied')
+  })
+
+  it('folds older games into one column on the TV when the series is long', async () => {
+    const { SeriesTable } = await import('./components')
+    const { seriesSummary } = await import('./logic')
+    const players = [
+      { seat: 0, name: 'Jeff', deck: 'green' as const },
+      { seat: 1, name: 'James', deck: 'red' as const },
+    ]
+    const games = Array.from({ length: 14 }, (_, i) => ({ scores: [i, 1], winners: [i > 1 ? 0 : 1] }))
+    const html = renderToString(createElement(SeriesTable, { series: seriesSummary(games, players)!, players, variant: 'tv' }))
+    expect(html).toContain('G1–5')
+    expect(html).toContain('G14')
+    expect(html).not.toContain('>G3<')
+  })
+})

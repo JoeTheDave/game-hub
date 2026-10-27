@@ -79,6 +79,10 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **The default tab is the most common action** (Splendor: Gems).
 - **The phone always shows what the player could do,** even off-turn (e.g. affordable marks). Off-turn, action buttons are hidden but browsing works. Pending sub-steps (discard, choose) take over the screen.
 - **End screen:** final standings, a crown in its own column for the winner(s), and a **Rematch** button whenever `rematch` is provided (seat 0 only). No "Game Over" heading. Disable the button while it's starting.
+- **Series across rematches:**
+  - Implement `GameModule.summary(state)` (final score per seat + winners). The platform then records one entry per completed game in `instance.history` (kept across rematches, reset by a new lobby).
+  - When `history.length >= 2`, the end screen adds a series table: a column per game (that game's winning score in gold) plus an emphasised Total, a laurel on the overall leader by cumulative score, and a one-line summary. Dragonheart's `SeriesTable` and `seriesSummary` are the reference.
+  - The current match's own standings (with its crown) stay above it. On the phone, only the table scrolls sideways (names and Total pinned) and the results panel scrolls, never the page.
 - **Uses the same composed components and art as the TV.** Light haptics; sound plays on the TV only.
 - **Buttons:** active = `cursor-pointer`; disabled = faded + `cursor-default`, never `cursor-not-allowed`.
 

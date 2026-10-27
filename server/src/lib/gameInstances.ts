@@ -2,7 +2,7 @@ import { randomInt } from 'crypto'
 import { Prisma } from '@prisma/client'
 import prisma from './prisma.js'
 import { GAMES, getGame } from '../games/registry.js'
-import type { GameEvent, GameModule, Rng, SeatInfo } from '../games/types.js'
+import type { GameEvent, GameModule, GameSummary, Rng, SeatInfo } from '../games/types.js'
 import { emitToSeat, emitToTable } from './socket.js'
 
 export type Phase = 'lobby' | 'playing' | 'finished'
@@ -11,6 +11,8 @@ export type Phase = 'lobby' | 'playing' | 'finished'
 export interface StoredGameState {
   phase: Phase
   state?: unknown
+  /** One summary per completed game in this instance (kept across rematches; public). */
+  history?: GameSummary[]
 }
 
 export const instanceInclude = {
@@ -47,7 +49,23 @@ export function withInstanceLock<T>(id: string, fn: (tx: Prisma.TransactionClien
 export function storedState(instance: { gameState: Prisma.JsonValue | null }): StoredGameState {
   const gs = instance.gameState as Partial<StoredGameState> | null
   const phase: Phase = gs?.phase === 'playing' || gs?.phase === 'finished' ? gs.phase : 'lobby'
-  return { phase, state: gs?.state }
+  return { phase, state: gs?.state, history: Array.isArray(gs?.history) ? gs.history : [] }
+}
+
+/**
+ * The match history after a write: a game that just finished (phase playing → finished) appends
+ * its summary exactly once. A game can only finish through a `playing` write, so it can't double up.
+ */
+export function historyAfter(
+  mod: GameModule<unknown, unknown>,
+  prevPhase: Phase,
+  nextPhase: Phase,
+  nextState: unknown,
+  history: GameSummary[]
+): GameSummary[] {
+  if (prevPhase === 'finished' || nextPhase !== 'finished' || !mod.summary) return history
+  const s = mod.summary(nextState)
+  return s ? [...history, s] : history
 }
 
 export function seatInfos(instance: LoadedInstance): SeatInfo[] {
@@ -63,7 +81,7 @@ export function moduleFor(instance: LoadedInstance): GameModule<unknown, unknown
  * engine state only through tableView (never raw).
  */
 export function lobbySafe(instance: LoadedInstance) {
-  const { phase, state } = storedState(instance)
+  const { phase, state, history } = storedState(instance)
   const mod = moduleFor(instance)
   return {
     id: instance.id,
@@ -86,6 +104,8 @@ export function lobbySafe(instance: LoadedInstance) {
       signedIn: p.userId != null,
     })),
     tableView: phase !== 'lobby' && mod && state !== undefined ? mod.tableView(state, seatInfos(instance)) : null,
+    /** Completed games in this instance (series across rematches), oldest first. */
+    history: history ?? [],
   }
 }
 

@@ -697,4 +697,5 @@ export const splendorModule: GameModule<SplendorState, SplendorAction> = {
   activeSeats: (s) => (s.result ? [] : [s.turn]),
   legalActions,
   winners: (s) => (s.result ? s.result.winners.slice() : []),
+  summary: (s) => (s.result ? { scores: s.players.map((p) => points(p)), winners: s.result.winners.slice() } : null),
 }

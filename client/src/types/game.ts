@@ -29,6 +29,14 @@ export interface GameInstance {
   players: LobbyPlayer[]
   /** The game's public tableView once started; null in the lobby. */
   tableView: unknown
+  /** Completed games in this instance, oldest first (a series across rematches). */
+  history?: GameSummary[]
+}
+
+/** One completed game's result: final score per seat (index = playerOrder) and winning seats. */
+export interface GameSummary {
+  scores: number[]
+  winners: number[]
 }
 
 /** Something that visibly happened (game-defined shape), for animation and sound. */

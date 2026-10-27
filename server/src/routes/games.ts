@@ -6,6 +6,7 @@ import { generateJoinCode } from '../lib/joinCode.js'
 import { getGame } from '../games/registry.js'
 import {
   broadcastInstance,
+  historyAfter,
   instanceInclude,
   loadInstance,
   lobbySafe,
@@ -235,15 +236,17 @@ async function setUpGame(req: Request, res: Response, from: 'lobby' | 'finished'
         error: from === 'lobby' ? 'Only the host or the first player can start the game' : 'Only the host or the first player can start a rematch',
       } as const
     }
-    const phase0 = storedState(instance).phase
+    const { phase: phase0, history: history0 } = storedState(instance)
     if (from === 'lobby' && phase0 !== 'lobby') return { status: 400, error: 'Game already started or finished' } as const
     if (from === 'finished' && phase0 !== 'finished') return { status: 400, error: 'The game is not over yet' } as const
     if (instance.players.length < mod.minPlayers) return { status: 400, error: 'Not enough players' } as const
     const { state, events } = mod.setup(seatInfos(instance), serverRng)
     const phase = mod.isFinished(state) ? 'finished' : 'playing'
+    // A rematch continues the series; a game started from the lobby begins a new one.
+    const history = from === 'finished' ? (history0 ?? []) : []
     await tx.gameInstance.update({
       where: { id },
-      data: { gameState: { phase, state } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
+      data: { gameState: { phase, state, history } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
     })
     return { status: 200, events } as const
   })
@@ -289,7 +292,7 @@ router.post('/games/instances/:id/action', async (req: Request, res: Response) =
     const seat = playerOrder as number
     const mod = moduleFor(instance)
     if (!mod) return res.status(400).json({ error: 'Unknown game type' })
-    const { phase, state } = storedState(instance)
+    const { phase, state, history } = storedState(instance)
     if (phase !== 'playing' || state === undefined) return res.status(400).json({ error: 'Game is not in progress' })
     if (typeof version === 'number' && version !== instance.version) {
       return res.status(409).json({ error: 'The game changed — try again', playerView: playerViewFor(instance, seat), version: instance.version })
@@ -297,7 +300,9 @@ router.post('/games/instances/:id/action', async (req: Request, res: Response) =
     const result = mod.applyAction(state, seat, action, serverRng)
     if (!result.ok) return res.status(400).json({ error: result.error })
     const nextPhase = mod.isFinished(result.state) ? 'finished' : 'playing'
-    if (!(await versionedWrite(id, instance.version, { phase: nextPhase, state: result.state }))) {
+    // The finishing move records this game's result in the instance's match history (once).
+    const nextHistory = historyAfter(mod, phase, nextPhase, result.state, history ?? [])
+    if (!(await versionedWrite(id, instance.version, { phase: nextPhase, state: result.state, history: nextHistory }))) {
       const fresh = await loadInstance(id)
       return res.status(409).json({
         error: 'The game changed — try again',

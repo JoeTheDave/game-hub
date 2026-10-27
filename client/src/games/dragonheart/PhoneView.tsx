@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import type { PhoneViewProps } from '../types'
 import type { DragonheartAction, DragonheartPlayerView } from '@games/dragonheart/engine'
 import { CARD_BY_ID, GREAT_DRAGON_POINTS, KIND_NAMES } from '@games/dragonheart/data'
-import { CARD_RATIO, Card, GreatDragon, kindOf } from './components'
-import { choiceLabel, handGrid, matchingOptions, previewText, selectable, toggle } from './logic'
+import { CARD_RATIO, Card, GreatDragon, SeriesTable, kindOf } from './components'
+import { choiceLabel, handGrid, matchingOptions, previewText, selectable, seriesSummary, toggle } from './logic'
+import type { GameSummary } from '../../types/game'
 import { TABLE_IMG } from './assets'
 import { FINAL_HEADLINE } from './TableView'
 import './dragonheart.css'
@@ -42,7 +43,7 @@ const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] curso
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
-export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
+export function PhoneView({ instance, view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
   const [selected, setSelected] = useState<string[]>([])
   const [pileOpen, setPileOpen] = useState(false)
   const me = view.players.find((p) => p.seat === playerOrder)
@@ -109,7 +110,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
       )}
 
       {view.finished ? (
-        <Finished view={view} me={playerOrder} rematch={rematch} />
+        <Finished view={view} me={playerOrder} rematch={rematch} history={instance?.history} />
       ) : (
         <>
           <Hand view={view} selected={selected} canAct={isMyTurn} onTap={(id) => setSelected((s) => toggle(options, s, id))} />
@@ -230,11 +231,14 @@ function ScorePileSheet({ view, onClose }: { view: DragonheartPlayerView; onClos
   )
 }
 
-function Finished({ view, me, rematch }: { view: DragonheartPlayerView; me: number; rematch?: () => Promise<boolean> }) {
+function Finished({ view, me, rematch, history }: { view: DragonheartPlayerView; me: number; rematch?: () => Promise<boolean>; history?: GameSummary[] }) {
   const r = view.result!
+  const series = seriesSummary(history, view.players)
   const [starting, setStarting] = useState(false)
   return (
-    <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-4">
+    // A long series may not fit a small phone: this panel (never the page) scrolls.
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+    <div className="min-h-full flex flex-col items-center justify-center gap-4 px-4 py-3">
       <div className="dh-title text-4xl">Dragonheart</div>
       <div className="dh-serif text-lg text-center">{FINAL_HEADLINE}</div>
       <div className="w-full max-w-sm flex flex-col gap-2">
@@ -251,6 +255,11 @@ function Finished({ view, me, rematch }: { view: DragonheartPlayerView; me: numb
           </div>
         ))}
       </div>
+      {series && (
+        <div className="w-full max-w-sm">
+          <SeriesTable series={series} players={view.players} variant="phone" />
+        </div>
+      )}
       {rematch && (
         <button
           type="button"
@@ -266,6 +275,7 @@ function Finished({ view, me, rematch }: { view: DragonheartPlayerView; me: numb
           {starting ? 'Starting…' : 'Rematch'}
         </button>
       )}
+    </div>
     </div>
   )
 }

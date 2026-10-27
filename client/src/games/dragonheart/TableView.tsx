@@ -2,7 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import type { TableViewProps } from '../types'
 import type { DragonheartTableView, PublicPlayer } from '@games/dragonheart/engine'
 import { CAPACITY, SPACES, type DeckColor, type Space } from '@games/dragonheart/data'
-import { Card, CardBack, GreatDragon, Outline, StackEdges, deckOf, jitter, seatHex } from './components'
+import { Card, CardBack, GreatDragon, Outline, SeriesTable, StackEdges, deckOf, jitter, seatHex } from './components'
+import { seriesSummary } from './logic'
+import type { GameSummary } from '../../types/game'
 import { FlipCard, FlyerView, type Flyer, type Rect } from './flyers'
 import {
   BOARD,
@@ -57,7 +59,7 @@ const placed = (r: Rect, extra?: CSSProperties): CSSProperties => ({
 })
 
 // ——— The table ———
-export function TableView({ view, events, seq, onEventsDone, sound }: TableViewProps<DragonheartTableView>) {
+export function TableView({ instance, view, events, seq, onEventsDone, sound }: TableViewProps<DragonheartTableView>) {
   const scale = useStageScale()
   const prevViewRef = useRef<DragonheartTableView | null>(null)
   const lastSeqRef = useRef<number | null>(null)
@@ -174,7 +176,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
           <FlyerView key={f.key} flyer={f} reduced={reduced} />
         ))}
 
-        {view.finished && view.result && flyers.length === 0 && <Standings view={view} />}
+        {view.finished && view.result && flyers.length === 0 && <Standings view={view} history={instance?.history} />}
       </div>
     </div>
   )
@@ -475,8 +477,9 @@ function PlaceCard({ p, x, y, first, finalTurn, maxW }: { p: PublicPlayer; x: nu
 /** The end-of-game headline (Joe: always "Final Score", whoever won). */
 export const FINAL_HEADLINE = 'Final Score'
 
-function Standings({ view }: { view: DragonheartTableView }) {
+function Standings({ view, history }: { view: DragonheartTableView; history?: GameSummary[] }) {
   const r = view.result!
+  const series = seriesSummary(history, view.players)
   return (
     <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,6,2,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40 }}>
       <div
@@ -512,6 +515,7 @@ function Standings({ view }: { view: DragonheartTableView }) {
             </div>
           )
         })}
+        {series && <SeriesTable series={series} players={view.players} variant="tv" />}
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { dragonheartModule, playerView, type DragonheartAction, type DragonheartState } from '@games/dragonheart/engine'
 import { CARD_BY_ID } from '@games/dragonheart/data'
 import { seededRng, type SeatInfo } from '@games/types'
-import { choiceLabel, handGrid, matchingOptions, maxPerKind, previewText, selectable, toggle } from './logic'
+import { choiceLabel, handGrid, matchingOptions, maxPerKind, previewText, selectable, seriesSummary, toggle } from './logic'
 
 const seats: SeatInfo[] = [0, 1].map((i) => ({ playerOrder: i, screenName: `P${i + 1}`, color: null }))
 
@@ -122,5 +122,57 @@ describe('handGrid', () => {
     }
     // Portrait may still use more rows.
     expect(handGrid(360, 520, 6, 336 / 220, 10, false).rows).toBeGreaterThan(1)
+  })
+})
+
+describe('seriesSummary (match history across rematches)', () => {
+  const players = [
+    { seat: 0, name: 'Jeff' },
+    { seat: 1, name: 'James' },
+  ]
+
+  it('is null until two games have been completed', () => {
+    expect(seriesSummary(undefined, players)).toBeNull()
+    expect(seriesSummary([], players)).toBeNull()
+    expect(seriesSummary([{ scores: [72, 43], winners: [0] }], players)).toBeNull()
+  })
+
+  it('totals each seat and names the overall leader', () => {
+    const s = seriesSummary(
+      [
+        { scores: [72, 43], winners: [0] },
+        { scores: [40, 61], winners: [1] },
+        { scores: [55, 50], winners: [0] },
+      ],
+      players
+    )!
+    expect(s.totals).toEqual([167, 154])
+    expect(s.leaders).toEqual([0])
+    expect(s.line).toBe('Jeff leads the series · 167 to 154')
+  })
+
+  it('can be led by a player who won fewer games', () => {
+    const s = seriesSummary(
+      [
+        { scores: [30, 29], winners: [0] },
+        { scores: [31, 30], winners: [0] },
+        { scores: [10, 60], winners: [1] },
+      ],
+      players
+    )!
+    expect(s.leaders).toEqual([1])
+    expect(s.line).toBe('James leads the series · 119 to 71')
+  })
+
+  it('reports a tied series', () => {
+    const s = seriesSummary(
+      [
+        { scores: [50, 40], winners: [0] },
+        { scores: [40, 50], winners: [1] },
+      ],
+      players
+    )!
+    expect(s.leaders).toEqual([0, 1])
+    expect(s.line).toBe('Series tied · 90 to 90')
   })
 })

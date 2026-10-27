@@ -283,4 +283,48 @@ describe('rematch', () => {
     const res = await request(app).post(`/api/games/instances/${id}/rematch`).send({ joinToken: a.joinToken })
     expect(res.status).toBe(400)
   })
+
+  async function playTo(g: { id: string; a: { joinToken: string }; b: { joinToken: string } }, moves: [number, number, number][]) {
+    for (const [seat, row, col] of moves) {
+      const tok = seat === 0 ? g.a.joinToken : g.b.joinToken
+      const r = await request(app).post(`/api/games/instances/${g.id}/action`).send({ playerOrder: seat, joinToken: tok, action: { type: 'place', row, col } })
+      expect(r.status).toBe(200)
+    }
+  }
+
+  it('records each finished game once and keeps the series across rematches', async () => {
+    const g = await finishedGame() // X (seat 0) wins game 1
+    let inst = await request(app).get(`/api/games/instances/${g.id}`)
+    expect(inst.body.history).toEqual([{ scores: [1, 0], winners: [0] }])
+    // A rejected move after the end must not append again.
+    await request(app).post(`/api/games/instances/${g.id}/action`).send({ playerOrder: 1, joinToken: g.b.joinToken, action: { type: 'place', row: 2, col: 2 } })
+    inst = await request(app).get(`/api/games/instances/${g.id}`)
+    expect(inst.body.history).toHaveLength(1)
+
+    const rm = await request(app).post(`/api/games/instances/${g.id}/rematch`).send({ joinToken: g.a.joinToken })
+    expect(rm.status).toBe(200)
+    expect(rm.body.history).toHaveLength(1) // the series carries on into the new game
+    // Game 2: O (seat 1) wins down the middle column.
+    await playTo(g, [
+      [0, 0, 0],
+      [1, 0, 1],
+      [0, 2, 0],
+      [1, 1, 1],
+      [0, 2, 2],
+      [1, 2, 1],
+    ])
+    inst = await request(app).get(`/api/games/instances/${g.id}`)
+    expect(inst.body.phase).toBe('finished')
+    expect(inst.body.history).toEqual([
+      { scores: [1, 0], winners: [0] },
+      { scores: [0, 1], winners: [1] },
+    ])
+  })
+
+  it('starts a fresh history in a new instance', async () => {
+    await finishedGame()
+    const fresh = await startedGame()
+    const inst = await request(app).get(`/api/games/instances/${fresh.id}`)
+    expect(inst.body.history).toEqual([])
+  })
 })

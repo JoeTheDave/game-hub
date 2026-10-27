@@ -134,4 +134,10 @@ export const ticTacToe: GameModule<TicTacToeState, TicTacToeAction> = {
   },
 
   winners: (state) => (state.winner != null ? [state.winner] : []),
+
+  // A series of tic-tac-toe games is scored as wins: 1 for the winner, 0 otherwise (a draw is 0–0).
+  summary: (state) =>
+    state.status === 'playing'
+      ? null
+      : { scores: [0, 1].map((seat) => (state.winner === seat ? 1 : 0)), winners: state.winner != null ? [state.winner] : [] },
 }

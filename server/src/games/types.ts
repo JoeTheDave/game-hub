@@ -40,6 +40,18 @@ export interface GameModule<S, A> {
   legalActions(state: S, playerOrder: number): A[]
   /** Winning seats once finished (empty otherwise). */
   winners(state: S): number[]
+  /**
+   * Optional: a finished game's final scores per seat (index = playerOrder) and winners. The
+   * platform records one per completed game, so a series of rematches can show a history table
+   * and cumulative totals. Null while the game is unfinished.
+   */
+  summary?(state: S): GameSummary | null
+}
+
+/** One completed game's result, as recorded in an instance's match history. */
+export interface GameSummary {
+  scores: number[]
+  winners: number[]
 }
 
 /** Deterministic seedable PRNG (mulberry32). Use for tests and simulation. */
