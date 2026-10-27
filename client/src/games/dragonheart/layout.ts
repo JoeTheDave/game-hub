@@ -227,13 +227,18 @@ export function glowRect(seat: number) {
  * Where a space's note sits: centred just inside the bottom edge of its top (newest) card, between
  * the corner value squares. `count` is the number of cards on the space.
  */
+/** Font size of the "N pts" note (doubled in iteration 13 so it reads from the couch). */
+export const NOTE_FONT_PX = 26
+/** The note's top sits this far above the card's bottom edge, so the whole line stays on the card. */
+const NOTE_INSET = NOTE_FONT_PX + 14
+
 export function noteAnchor(space: Space | 'belowShip', count: number): { x: number; y: number; w: number } {
   if (space === 'belowShip') {
     const o = outlineRect('belowShip')
-    return { x: o.x + o.w / 2, y: o.y + o.h - 30, w: o.w }
+    return { x: o.x + o.w / 2, y: o.y + o.h - NOTE_INSET, w: o.w }
   }
   const o = outlineRect(space, outlineIndexFor(space, Math.max(0, count - 1)))
-  return { x: o.x + o.w / 2, y: o.y + o.h - 30, w: o.w }
+  return { x: o.x + o.w / 2, y: o.y + o.h - NOTE_INSET, w: o.w }
 }
 
 export const TURN_LIGHT = { rgb: [255, 196, 112] as const, alpha: 0.5 }

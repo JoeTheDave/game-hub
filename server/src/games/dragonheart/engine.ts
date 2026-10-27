@@ -166,8 +166,15 @@ function parseAction(raw: unknown): Parsed {
 interface PlayOutcome {
   state: DragonheartState
   events: GameEvent[]
-  collected: { from: CollectSource; count: number }[]
+  collected: Collected[]
   tookDragon: boolean
+}
+
+/** One collection: where from, how many cards, and their total points (public: values are announced when played). */
+export interface Collected {
+  from: CollectSource
+  count: number
+  points: number
 }
 
 /** Validate and resolve one play (Play + Collect steps), without the Draw step or turn change. */
@@ -208,7 +215,7 @@ function resolvePlay(
   const s = cloneState(s0)
   const p = s.players[seat]
   const events: GameEvent[] = []
-  const collected: { from: CollectSource; count: number }[] = []
+  const collected: Collected[] = []
   let tookDragon = false
 
   // 1. Play Cards
@@ -223,7 +230,7 @@ function resolvePlay(
     // Only what was face-up and visible may be named: every card on a capacity space, the top of a stack.
     const visibleIds = from !== 'belowShip' && CAPACITY[from] > 0 ? pile.slice() : [pile[pile.length - 1]]
     p.score.push(...pile)
-    collected.push({ from, count: pile.length })
+    collected.push({ from, count: pile.length, points: pileValue(pile) })
     events.push({ type: 'cardsCollected', seat, from, count: pile.length, visibleIds })
     if (from === 'belowShip') s.belowShip = []
     else s.spaces[from] = []
@@ -365,8 +372,8 @@ function applyAction(s0: DragonheartState, seat: number, raw: DragonheartAction,
 export interface PlayPreview {
   space: Space
   count: number
-  /** What the play collects into the score pile. */
-  collects: { from: CollectSource; count: number }[]
+  /** What the play collects into the score pile, with the points it's worth. */
+  collects: Collected[]
   takesDragon: boolean
   /** Knights/Huntresses move below the Ship. */
   movesBelowShip: boolean

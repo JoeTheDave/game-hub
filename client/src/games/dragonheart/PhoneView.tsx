@@ -35,6 +35,9 @@ const buzz = (pattern: number | number[]) => {
   }
 }
 
+/** Reserved height of the action area (button + preview line, or two choice buttons). */
+export const ACTION_AREA_PX = 124
+
 const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] cursor-pointer disabled:cursor-default disabled:opacity-40 disabled:active:scale-100'
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
@@ -62,10 +65,12 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
   }
 
   const turnName = view.players.find((p) => p.seat === view.turn)?.name ?? ''
+  // Turn status sits in the header row, inline with the name and score (Joe, iteration 13).
   let status: ReactNode = null
   if (view.finished) status = null // Joe: no "Game Over" heading on the phone's end screen
   else if (isMyTurn) status = <span className="text-emerald-300 font-bold">{view.finalTurn ? 'Your final turn!' : 'Your turn'}</span>
-  else status = `Waiting for ${turnName}…${view.finalTurn ? ' (final turn)' : ''}`
+  else status = <span className="text-amber-100/75">{`Waiting for ${turnName}…${view.finalTurn ? ' (final turn)' : ''}`}</span>
+  const hasDragon = !!me?.hasDragon
 
   const deckHex = me?.deck === 'red' ? '#a32020' : '#2f8a3a'
   const matches = matchingOptions(options, selected)
@@ -78,24 +83,27 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
     >
       {/* Header: me */}
       <div className="shrink-0 px-3 pt-2 pb-2 border-b border-white/10" style={{ background: 'rgba(0,0,0,.25)' }}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="w-3.5 h-5 rounded-sm shrink-0" style={{ background: deckHex }} title={`${me?.deck} deck`} />
-          <span className="dh-serif text-xl truncate flex-1">{me?.name}</span>
+          <span className="dh-serif text-xl truncate shrink min-w-0 max-w-[45%]">{me?.name}</span>
+          <span className="flex-1 min-w-0 truncate text-right text-sm">{status}</span>
           <button
             type="button"
             onClick={() => setPileOpen(true)}
-            className="ml-1 px-2.5 py-1 rounded-full bg-amber-100/15 border border-amber-100/20 flex items-baseline gap-1 cursor-pointer"
+            className="shrink-0 ml-1 px-2.5 py-1 rounded-full bg-amber-100/15 border border-amber-100/20 flex items-center gap-1 cursor-pointer"
             title="Your score pile"
           >
+            {hasDragon && <GreatDragon size={20} style={{ filter: 'none' }} />}
             <span className="dh-numeral text-xl">{view.scorePileValue}</span>
             <span className="text-amber-300 text-xs">pts</span>
+            {hasDragon && <span className="text-amber-300 text-sm font-bold">{`+${GREAT_DRAGON_POINTS}`}</span>}
           </button>
         </div>
-        {status != null && <div className="mt-1.5 text-center text-sm text-amber-100/80">{status}</div>}
       </div>
 
+      {/* Errors float over the table, so they never push the hand around. */}
       {error && (
-        <button type="button" onClick={clearError} className="shrink-0 mx-3 mt-2 px-3 py-2 rounded-lg bg-red-900/80 text-red-100 text-sm text-left cursor-pointer">
+        <button type="button" onClick={clearError} className="absolute left-3 right-3 top-14 z-10 px-3 py-2 rounded-lg bg-red-900/90 text-red-100 text-sm text-left cursor-pointer shadow-lg">
           {error} <span className="opacity-60">(tap to dismiss)</span>
         </button>
       )}
@@ -106,11 +114,11 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
         <>
           <Hand view={view} selected={selected} canAct={isMyTurn} onTap={(id) => setSelected((s) => toggle(options, s, id))} />
 
-          {/* Action bar */}
-          <div className="shrink-0 px-3 pb-3 pt-1 flex flex-col gap-2">
+          {/* Action area: a fixed height that is always reserved, so selecting cards never resizes the hand. */}
+          <div className="shrink-0 px-3 pb-3 pt-1 flex flex-col justify-end gap-2" style={{ height: ACTION_AREA_PX }}>
             {isMyTurn && selected.length > 0 && matches.length === 1 && (
               <>
-                <div className="text-center text-sm text-amber-100/85 min-h-5">{previewText(matches[0].preview)}</div>
+                <div className="text-center text-sm text-amber-100/85 min-h-5 truncate">{previewText(matches[0].preview)}</div>
                 <button type="button" disabled={pending} onClick={() => void act(matches[0].action)} className={`${primaryBtn} w-full py-3.5 text-lg`}>
                   {pending ? 'Playing…' : `Play ${selected.length} to ${KIND_NAMES[kindOf(selected[0])]}`}
                 </button>
@@ -125,7 +133,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
                   {matches.map((m, i) => (
                     <button key={i} type="button" disabled={pending} onClick={() => void act(m.action)} className={`${primaryBtn} py-3.5`}>
                       {choiceLabel(m)}
-                      {m.preview?.takesDragon && <span className="block text-xs font-semibold">+ the Great Dragon</span>}
+                      {m.preview?.takesDragon && <span className="block text-xs font-semibold">+ the Great Dragon (+{GREAT_DRAGON_POINTS})</span>}
                     </button>
                   ))}
                 </div>

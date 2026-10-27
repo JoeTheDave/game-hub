@@ -239,3 +239,41 @@ describe('stack edges can never read as a gray box', () => {
     expect((html.match(/clip-path:polygon\(/g) ?? []).length).toBe(layers.length)
   })
 })
+
+describe('phone layout stays put', () => {
+  const phone = (s: DragonheartState, seat: number, error: string | null = null) =>
+    renderToString(
+      createElement(PhoneView, {
+        instance,
+        view: dragonheartModule.playerView(s, seat, seats) as never,
+        playerOrder: seat,
+        me: undefined,
+        players: [],
+        sendAction: async () => true,
+        pending: false,
+        error,
+        clearError: noop,
+      })
+    )
+
+  it('reserves the same action area on and off turn, and errors never take layout space', async () => {
+    const { ACTION_AREA_PX } = await import('./PhoneView')
+    const s = play(9)[1]
+    const onTurn = phone(s, s.turn)
+    const offTurn = phone(s, 1 - s.turn)
+    const withError = phone(s, s.turn, 'Nope')
+    for (const html of [onTurn, offTurn, withError]) expect(html).toContain(`height:${ACTION_AREA_PX}px`)
+    // the error banner is absolutely positioned (floats over the table)
+    expect(withError).toMatch(/class="absolute[^"]*bg-red-900/)
+  })
+
+  it('puts the turn status in the header and shows the dragon bonus there', () => {
+    const s = play(9)[1]
+    const html = phone(s, s.turn)
+    expect(html).toMatch(/Your (final )?turn/)
+    const holder = s.greatDragon === 'board' ? null : s.greatDragon
+    const withDragon = { ...s, greatDragon: 0 as const }
+    expect(phone(withDragon, 0)).toContain('+3')
+    if (holder === null) expect(phone(s, 0)).not.toMatch(/>\+3</)
+  })
+})

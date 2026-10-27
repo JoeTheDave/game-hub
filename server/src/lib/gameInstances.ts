@@ -38,7 +38,8 @@ export async function loadInstance(id: string, db: Prisma.TransactionClient = pr
  */
 export function withInstanceLock<T>(id: string, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "GameInstance" WHERE id = ${id}::uuid FOR UPDATE`
+    // A malformed id can't be locked (the ::uuid cast would throw); loadInstance then reports it as not found.
+    if (UUID_RE.test(id)) await tx.$queryRaw`SELECT id FROM "GameInstance" WHERE id = ${id}::uuid FOR UPDATE`
     return fn(tx)
   })
 }

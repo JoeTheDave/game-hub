@@ -1,4 +1,4 @@
-import { CARD_BY_ID, KIND_NAMES, type Kind } from '@games/dragonheart/data'
+import { CARD_BY_ID, GREAT_DRAGON_POINTS, KIND_NAMES, type Kind } from '@games/dragonheart/data'
 import type { DragonheartAction, PlayOption, PlayPreview } from '@games/dragonheart/engine'
 
 /**
@@ -64,14 +64,16 @@ const SOURCE_NAME = (from: string) => (from === 'belowShip' ? 'below the Ship' :
 /** A one-line description of what a play will do. */
 export function previewText(p: PlayPreview | null): string {
   if (!p) return ''
-  const parts: string[] = []
-  for (const c of p.collects) if (c.count > 0) parts.push(`collects ${c.count} card${c.count === 1 ? '' : 's'} from ${SOURCE_NAME(c.from)}`)
-  if (p.takesDragon) parts.push('takes the Great Dragon')
-  if (p.movesBelowShip) parts.push(`sends the ${KIND_NAMES[p.space]}s below the Ship`)
-  if (p.shipStack != null) parts.push(p.shipStack >= 3 ? 'sails the third ship — the game ends' : `sails ship stack ${p.shipStack} of 3`)
-  if (parts.length === 0) return 'No effect this turn'
-  const s = parts.join(', ')
-  return s[0].toUpperCase() + s.slice(1)
+  // Points first (Joe, iteration 13): what the play is worth matters more than the card count.
+  const taken = p.collects.filter((c) => c.count > 0)
+  let s = taken.length
+    ? 'Takes ' + taken.map((c) => `${c.points} pt${c.points === 1 ? '' : 's'} from ${SOURCE_NAME(c.from)}`).join(' and ')
+    : 'No cards collected'
+  if (p.takesDragon) s += ` + the Great Dragon (+${GREAT_DRAGON_POINTS})`
+  const extra: string[] = []
+  if (p.movesBelowShip) extra.push(`the ${KIND_NAMES[p.space]}s go below the Ship`)
+  if (p.shipStack != null) extra.push(p.shipStack >= 3 ? 'the third ship sails: the game ends' : `ship stack ${p.shipStack} of 3 sails`)
+  return extra.length ? `${s}; ${extra.join('; ')}` : s
 }
 
 /** Label for a collect choice button. */
@@ -79,7 +81,7 @@ export function choiceLabel(o: PlayOption): string {
   const a = o.action as Play
   const c = o.preview?.collects[0]
   const target = a.collect ?? c?.from
-  return target ? `Take ${SOURCE_NAME(target)}${c ? ` (${c.count})` : ''}` : 'Play'
+  return target ? `Take ${SOURCE_NAME(target)}${c ? ` · ${c.points} pt${c.points === 1 ? '' : 's'}` : ''}` : 'Play'
 }
 
 /**

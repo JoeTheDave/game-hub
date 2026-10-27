@@ -13,6 +13,7 @@ import {
   boardDragonRect,
   boundsOf,
   noteAnchor,
+  NOTE_FONT_PX,
   outlineIndexFor,
   outlineRect,
   slotZ,
@@ -88,6 +89,10 @@ describe('board layout (measured from the real board)', () => {
         expect(a.x - a.w / 2).toBeGreaterThanOrEqual(0)
         expect(a.x + a.w / 2).toBeLessThanOrEqual(W)
         expect(a.y).toBeLessThanOrEqual(H - 20)
+        // the (doubled) note line sits entirely on the top card, above its bottom edge
+        const o = s === 'belowShip' ? outlineRect('belowShip') : outlineRect(s, outlineIndexFor(s, n - 1))
+        expect(a.y).toBeGreaterThanOrEqual(o.y)
+        expect(a.y + NOTE_FONT_PX).toBeLessThanOrEqual(o.y + o.h - 4)
       }
   })
 

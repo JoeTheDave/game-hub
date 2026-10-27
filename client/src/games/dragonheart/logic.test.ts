@@ -78,14 +78,20 @@ describe('hand selection', () => {
 })
 
 describe('previewText', () => {
-  it('describes collections, the dragon, Knights/Huntresses and ships', () => {
+  it('leads with the points collected, then the dragon, Knights/Huntresses and ships', () => {
     expect(previewText(null)).toBe('')
-    expect(previewText({ space: 'treasure', count: 1, collects: [], takesDragon: false, movesBelowShip: false, shipStack: null })).toBe('No effect this turn')
-    expect(previewText({ space: 'sorceress', count: 1, collects: [{ from: 'petrified', count: 2 }], takesDragon: true, movesBelowShip: false, shipStack: null })).toBe(
-      'Collects 2 cards from Petrified Dragon, takes the Great Dragon'
+    expect(previewText({ space: 'treasure', count: 1, collects: [], takesDragon: false, movesBelowShip: false, shipStack: null })).toBe('No cards collected')
+    expect(previewText({ space: 'fireDragon', count: 1, collects: [{ from: 'treasure', count: 3, points: 7 }], takesDragon: false, movesBelowShip: false, shipStack: null })).toBe(
+      'Takes 7 pts from Treasure Chest'
     )
-    expect(previewText({ space: 'ship', count: 1, collects: [{ from: 'belowShip', count: 3 }], takesDragon: false, movesBelowShip: false, shipStack: 3 })).toMatch(/game ends/)
-    expect(previewText({ space: 'knight', count: 1, collects: [{ from: 'troll', count: 1 }], takesDragon: false, movesBelowShip: true, shipStack: null })).toMatch(/below the Ship/)
+    expect(previewText({ space: 'sorceress', count: 1, collects: [{ from: 'petrified', count: 2, points: 4 }], takesDragon: true, movesBelowShip: false, shipStack: null })).toBe(
+      'Takes 4 pts from Petrified Dragon + the Great Dragon (+3)'
+    )
+    expect(previewText({ space: 'troll', count: 1, collects: [{ from: 'sorceress', count: 1, points: 1 }], takesDragon: false, movesBelowShip: false, shipStack: null })).toBe(
+      'Takes 1 pt from Sorceress'
+    )
+    expect(previewText({ space: 'ship', count: 1, collects: [{ from: 'belowShip', count: 3, points: 4 }], takesDragon: false, movesBelowShip: false, shipStack: 3 })).toMatch(/^Takes 4 pts .*game ends/)
+    expect(previewText({ space: 'knight', count: 1, collects: [{ from: 'troll', count: 1, points: 2 }], takesDragon: false, movesBelowShip: true, shipStack: null })).toMatch(/below the Ship/)
   })
 })
 

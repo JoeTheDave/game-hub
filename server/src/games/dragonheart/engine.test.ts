@@ -456,6 +456,46 @@ describe('legal actions and previews', () => {
     const toChest = v.options.find((o) => o.action.type === 'play' && o.action.collect === 'treasure')!
     expect(toChest.preview).toMatchObject({ collects: [{ from: 'treasure', count: 2 }], takesDragon: false })
   })
+
+  const pts = (ids: string[]) => ids.reduce((t, id) => t + CARD_BY_ID[id].points, 0)
+  const only = (v: ReturnType<typeof playerView>) => v.options.filter((o) => o.preview)
+
+  it('previews the points a Fire Dragon play collects from the Treasure Chest', () => {
+    const s = base()
+    const chest = onSpace(s, 1, 'treasure', 3)
+    hand(s, 0, 'fireDragon')
+    const [o] = only(playerView(s, 0, seats))
+    expect(o.preview!.collects).toEqual([{ from: 'treasure', count: 3, points: pts(chest) }])
+  })
+
+  it('previews points for each Sorceress choice', () => {
+    const s = base()
+    const chest = onSpace(s, 1, 'treasure', 2)
+    const pet = onSpace(s, 1, 'petrified', 2)
+    hand(s, 0, 'sorceress')
+    const v = playerView(s, 0, seats)
+    const by = (t: string) => v.options.find((o) => o.action.type === 'play' && o.action.collect === t)!.preview!
+    expect(by('treasure').collects).toEqual([{ from: 'treasure', count: 2, points: pts(chest) }])
+    expect(by('petrified').collects).toEqual([{ from: 'petrified', count: 2, points: pts(pet) }])
+  })
+
+  it('counts the cards being played when a Dwarf play completes the set', () => {
+    const s = base()
+    const there = onSpace(s, 1, 'dwarf', 3)
+    const mine = hand(s, 0, 'dwarf', 1, 3)
+    const [o] = only(playerView(s, 0, seats))
+    expect(o.preview!.collects).toEqual([{ from: 'dwarf', count: 4, points: pts([...there, ...mine]) }])
+  })
+
+  it('previews the points a Ship play collects from below the Ship', () => {
+    const s = base()
+    onSpace(s, 1, 'ship', 2)
+    const pile = [draw(s, 1, 'knight'), draw(s, 1, 'huntress'), draw(s, 1, 'knight')]
+    s.belowShip.push(...pile)
+    hand(s, 0, 'ship')
+    const [o] = only(playerView(s, 0, seats))
+    expect(o.preview!.collects).toEqual([{ from: 'belowShip', count: 3, points: pts(pile) }])
+  })
 })
 
 describe('hidden information', () => {

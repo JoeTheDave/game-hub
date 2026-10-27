@@ -65,7 +65,7 @@
 /* A subtle "7 pts" note under the top card of a space holding 2+ cards (vivid milky yellow). */
 .dh-stacknote {
   text-align: center;
-  font-size: 13px;
+  font-size: 26px; /* = NOTE_FONT_PX in layout.ts */
   font-weight: 700;
   letter-spacing: 0.04em;
   pointer-events: none;
