@@ -92,5 +92,9 @@ Joe's own token art (a silver coin with a dragon head and a key-pattern rim; sup
 - **Band repair:** cutting the Troll art out had left transparent holes in the side bands next to the window. They showed as a thick dark bar on every card. A clean straight filigree strip from the top band is now tiled under the whole band ring, and the right band between the top-right cartouche and the dragon's tail uses that strip outright (it still showed troll fur).
 - **Alignment:** the card's art layer is the outline's own board region (`cards/clips.json` records the exact pixel boxes) stretched to the full card box with no zoom or offset, under the frame. Board cards pass the outline's exact height, so they cover the painted board pixel-for-pixel.
 
-## Board arrows into the Sorceress (iteration 5)
-Joe's board image has no arrows into the Sorceress space, although the Knight and the Troll both collect from it. `tools/dragonheart-art/add_arrows.py <board.png> <out.png> [--preview p.png]` paints two curved silver arrows (Knight → Sorceress, Troll → Sorceress) in the style of the board's curved arrows, between the outlines. Then run `clip_cards.py <out.png>`. The arrows stay clear of every outline, so the card clips come out byte-identical; only `board/panorama.webp` changes.
+## Board arrows into the Sorceress (iteration 6, replaces iteration 5)
+Joe's board image has no arrows into the Sorceress. Iteration 5's code-drawn silver arrows were rejected. Now `tools/dragonheart-art/transplant_arrows.py <board.png> <reference.png> <out.png>` copies **only** the gold arrows from Joe's arrow reference (vault `Board Art/Board - Arrow Reference (other agent).png`) onto `Board - Joe v2.png`:
+- the reference is aligned (offset -3, +1)
+- the mask is a band along each traced arrow path, intersected with changed pixels, kept clear of the outlines, and feathered
+
+Only about 7k pixels change (bbox x 1203–1672, y 222–334); everything else is identical. Then run `clip_cards.py <out.png>`; the card clips come out byte-identical.
