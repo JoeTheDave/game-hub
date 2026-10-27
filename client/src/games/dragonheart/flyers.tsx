@@ -39,7 +39,17 @@ export interface Flyer {
   appear?: boolean
   /** When set, the flyer disappears at this time (ms) — when the same card's next flight starts. */
   vanishAt?: number
+  /**
+   * Stacking order among flyers (higher = in front). Cards on a space use their stack position, so
+   * a newly played card always flies in ON TOP of the cards already there (and, when the set is
+   * then collected, stays on top of them on the way out).
+   */
+  z?: number
 }
+
+/** Flyers sit above everything on the table; their own `z` orders them among themselves. */
+export const FLYER_Z_BASE = 30
+export const flyerZ = (f: Pick<Flyer, 'z'>) => FLYER_Z_BASE + (f.z ?? 20)
 
 /** Gentle ease-out: quick to leave, soft to land. */
 export const FLY_EASING = 'cubic-bezier(.22,.8,.3,1)'
@@ -127,6 +137,7 @@ export function FlyerView({ flyer, reduced }: { flyer: Flyer; reduced: boolean }
         transform: place(flyer.from, flyer.to),
         opacity: flyer.appear === false ? 0 : 1,
         perspective: 1600,
+        zIndex: flyerZ(flyer),
       }}
     >
       <div ref={inner} style={{ width: '100%', height: '100%', transformOrigin: '50% 50%', transformStyle: 'preserve-3d' }}>

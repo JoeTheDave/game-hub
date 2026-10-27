@@ -61,3 +61,13 @@ The petrified, ship, back, panorama and figure assets were each picked from 3–
 | `back-dragon` | sdxl | 832×1152 | 740 | a silver metallic serpentine dragon forming a large S shape, one dragon head at the top left and another dragon head at the bottom right of its long scaly coiled body, grey bat wings spread behind its middle, symmetrical heraldic emblem, monochrome silver and grey, highly detailed scales, centered, isolated on a pure flat black background |
 | `great-dragon` | flux | 768×768 | 642 | a small glossy deep crimson red plastic dragon miniature figurine, a board game playing piece, the dragon is seated upright on a small round base with its wings folded tightly along its back, long neck, head raised, molded scales, single solid deep red plastic color, studio product photo, three-quarter view, centered, fills two thirds of the frame, isolated on a flat uniform medium gray background, no shadow, no text |
 | `table` | flux | 1024×1024 | 650 | a flat top-down seamless texture of a dark weathered oak wood tabletop, deep brown-grey grain with fine cracks, evenly lit, full frame, no objects, no text |
+
+## Iteration 2 (2026-10-27): Joe's board image; cards clipped from it
+
+- **Board:** `board/panorama.webp` is Joe's own board image (2172×724), used as-is. It's Joe's art, supplied by him, so the "scans are reference only" rule doesn't apply. The original is kept in the vault at `Projects/game-hub/Dragonheart/Board Art/Board - Joe v2.png`.
+- **Geometry:** `../boardGeometry.json` holds the outlines measured on that image. Each outline was measured by eye on 2× zoomed crops with pixel rulers: front outline outer edges, plus the down-right stagger step of about 26 px for the back outlines.
+- **Card faces:** `cards/<kind>.webp` is the region inside each space's FRONT outline, frame included, clipped from the board and upscaled 2× with Lanczos. A card on the board is therefore identical to the board beneath it. Petrified Dragon's landscape clip is rotated 90° counter-clockwise to portrait; the TV turns it back on the board. Only the corner value squares are drawn in code.
+- **Card shape:** the outline shape (`CARD_RATIO = 336/220`), everywhere.
+- **Reproduce:** `python3 tools/dragonheart-art/clip_cards.py "<Board - Joe v2.png>" --check /tmp/out`. It rewrites the panorama and the 9 card faces, and with `--check` draws every measured outline (front red, back green) and the Great Dragon start spot for eyeballing.
+- **Great Dragon:** `figure/great-dragon.webp` (the 3D figure) is removed. The token is now a flat SVG medallion in `components.tsx`.
+- **Superseded:** the iteration 1 img2img board and card art below.

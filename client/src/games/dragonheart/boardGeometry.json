@@ -1,15 +1,19 @@
 {
- "_doc": "Board geometry measured from the stitched scan of Joe's board, in normalized coordinates of client/src/games/dragonheart/assets/board/panorama.webp (x,w as fractions of width; y,h of height). Board aspect = width/height. 'outlines' are listed in fill order: index 0 is the topmost (upper-left, drawn in front) outline that takes the first card; later outlines step down-right and sit behind. Orientation: portrait outlines are ~0.65 w/h; petrified and belowShip are landscape. belowShip extends past the board's bottom edge (y+h > 1), as on the real board where that pile sits below the board.",
- "aspect": 2.9756,
+ "_doc": "Board geometry measured on Joe's board image (assets/board/panorama.webp, 2172x724), normalized: x,w as fractions of width; y,h of height. 'outlines[0]' is the FRONT outline (top-left, drawn in front); later entries are the staggered back outlines stepping down-right. Capacity spaces fill BACK to FRONT (first card in the last outline, the newest card frontmost). Orientation: petrified and belowShip are landscape (cards lie turned 90 degrees). belowShip extends past the board's bottom edge. Arrows are painted into the art (kept here for reference only, approximate). Measured by tools/dragonheart-art/clip_cards.py --check overlays.",
+ "aspect": 3.0,
+ "source": {
+  "w": 2172,
+  "h": 724
+ },
  "spaces": {
   "fireDragon": {
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.1444,
-     "y": 0.0331,
-     "w": 0.1006,
-     "h": 0.4586
+     "x": 0.1446,
+     "y": 0.0318,
+     "w": 0.1008,
+     "h": 0.4641
     }
    ]
   },
@@ -17,10 +21,10 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.3906,
-     "y": 0.0315,
-     "w": 0.1011,
-     "h": 0.4603
+     "x": 0.3909,
+     "y": 0.0318,
+     "w": 0.1008,
+     "h": 0.4641
     }
    ]
   },
@@ -28,10 +32,10 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.6167,
-     "y": 0.0281,
-     "w": 0.1017,
-     "h": 0.4603
+     "x": 0.616,
+     "y": 0.0304,
+     "w": 0.1022,
+     "h": 0.4641
     }
    ]
   },
@@ -39,10 +43,10 @@
    "orientation": "landscape",
    "outlines": [
     {
-     "x": 0.7572,
-     "y": 0.0646,
-     "w": 0.1544,
-     "h": 0.298
+     "x": 0.7564,
+     "y": 0.0663,
+     "w": 0.1552,
+     "h": 0.2997
     }
    ]
   },
@@ -50,22 +54,22 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.0128,
-     "y": 0.3858,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.0115,
+     "y": 0.384,
+     "w": 0.1022,
+     "h": 0.4669
     },
     {
-     "x": 0.025,
-     "y": 0.4189,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.0239,
+     "y": 0.4199,
+     "w": 0.1022,
+     "h": 0.4655
     },
     {
-     "x": 0.0372,
-     "y": 0.452,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.0355,
+     "y": 0.4558,
+     "w": 0.1022,
+     "h": 0.4655
     }
    ]
   },
@@ -74,21 +78,21 @@
    "outlines": [
     {
      "x": 0.2528,
-     "y": 0.3841,
-     "w": 0.1,
-     "h": 0.4603
+     "y": 0.384,
+     "w": 0.1008,
+     "h": 0.4655
     },
     {
-     "x": 0.265,
-     "y": 0.4172,
-     "w": 0.1,
-     "h": 0.4603
+     "x": 0.2652,
+     "y": 0.4185,
+     "w": 0.1008,
+     "h": 0.4655
     },
     {
-     "x": 0.2772,
-     "y": 0.4503,
-     "w": 0.1,
-     "h": 0.4603
+     "x": 0.2767,
+     "y": 0.4572,
+     "w": 0.1008,
+     "h": 0.4655
     }
    ]
   },
@@ -96,16 +100,16 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.5017,
-     "y": 0.4619,
-     "w": 0.0983,
-     "h": 0.4603
+     "x": 0.4977,
+     "y": 0.4655,
+     "w": 0.1013,
+     "h": 0.4613
     },
     {
-     "x": 0.5128,
-     "y": 0.495,
-     "w": 0.0983,
-     "h": 0.4603
+     "x": 0.511,
+     "y": 0.5028,
+     "w": 0.1013,
+     "h": 0.4613
     }
    ]
   },
@@ -113,10 +117,10 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.7306,
-     "y": 0.4619,
-     "w": 0.1,
-     "h": 0.457
+     "x": 0.7302,
+     "y": 0.4669,
+     "w": 0.1008,
+     "h": 0.4599
     }
    ]
   },
@@ -124,28 +128,28 @@
    "orientation": "portrait",
    "outlines": [
     {
-     "x": 0.8483,
-     "y": 0.394,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.8476,
+     "y": 0.3978,
+     "w": 0.1022,
+     "h": 0.4599
     },
     {
-     "x": 0.86,
-     "y": 0.4288,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.8587,
+     "y": 0.4323,
+     "w": 0.1022,
+     "h": 0.4599
     },
     {
-     "x": 0.8717,
-     "y": 0.4636,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.8711,
+     "y": 0.4696,
+     "w": 0.1022,
+     "h": 0.4599
     },
     {
-     "x": 0.8833,
-     "y": 0.4983,
-     "w": 0.1,
-     "h": 0.4586
+     "x": 0.8831,
+     "y": 0.5055,
+     "w": 0.1022,
+     "h": 0.4599
     }
    ]
   },
@@ -153,9 +157,9 @@
    "orientation": "landscape",
    "outlines": [
     {
-     "x": 0.265,
-     "y": 0.9487,
-     "w": 0.1544,
+     "x": 0.2643,
+     "y": 0.9558,
+     "w": 0.1552,
      "h": 0.2997
     }
    ]
@@ -163,10 +167,10 @@
  },
  "greatDragonStart": {
   "center": [
-   0.9533,
-   0.3113
+   0.9475,
+   0.2928
   ],
-  "note": "open ground under the tree, right of Petrified Dragon and above the Dwarf"
+  "note": "open ground under the tree, right of the Petrified Dragon and above the Dwarf"
  },
  "arrows": [
   {

@@ -1,15 +1,19 @@
 import type { CSSProperties } from 'react'
 import { CARD_BY_ID, KIND_NAMES, type DeckColor, type Kind } from '@games/dragonheart/data'
-import { BACK_IMG, CARD_IMG, FIGURE_IMG } from './assets'
+import { BACK_IMG, CARD_IMG } from './assets'
 
 /**
- * Composed Dragonheart components. Card art is one generated illustration per kind; the frame,
- * corner squares, numerals and the dragon motif are drawn in code, so the same component renders
- * on the TV and the phone at any size. Components size themselves from `size` (card width, px)
- * and lay out their internals in em units (1em = size / 10).
+ * Composed Dragonheart components. A card face is the region of Joe's board inside that space's
+ * front outline (frame included), clipped by tools/dragonheart-art/clip_cards.py, so a card on the
+ * board looks exactly like the board beneath it; only the corner value squares are drawn in code.
+ * Components size themselves from `size` (card width, px) and lay out internals in em units
+ * (1em = size / 10), so the same component renders on the TV and the phone at any size.
  */
 
-export const CARD_RATIO = 88 / 63
+/** Cards are exactly the board's outline shape (≈220×336 on the source board), everywhere. */
+export const CARD_RATIO = 336 / 220
+/** Rounded corners matching the painted outline frame. */
+const CARD_RADIUS = '0.42em'
 
 export const DECK_FIELD: Record<DeckColor, { base: string; light: string }> = {
   green: { base: '#1f5a2a', light: '#3f8a3c' },
@@ -82,33 +86,11 @@ function Corner({ points, kind, flip, pos }: { points: number; kind: Kind; flip?
   )
 }
 
-/** A silver serpentine dragon running down the card's right edge (the real cards' frame motif). */
-function DragonEdge() {
-  return (
-    <svg
-      viewBox="0 0 10 100"
-      preserveAspectRatio="none"
-      style={{ position: 'absolute', right: '0.05em', top: '1.4em', bottom: '1.4em', width: '0.9em', height: 'calc(100% - 2.8em)', zIndex: 1 }}
-    >
-      <defs>
-        <linearGradient id="dh-silver" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#8d9298" />
-          <stop offset="0.5" stopColor="#f3f4f6" />
-          <stop offset="1" stopColor="#7c8188" />
-        </linearGradient>
-      </defs>
-      <path d="M5 0 C 9 10, 1 18, 5 28 S 9 46, 5 56 S 1 74, 5 84 S 8 96, 5 100" stroke="url(#dh-silver)" strokeWidth="2.4" fill="none" />
-      {[8, 22, 36, 50, 64, 78, 92].map((y) => (
-        <path key={y} d={`M5 ${y} l 3 -2 M5 ${y} l -3 -2`} stroke="#c7cbd0" strokeWidth="0.9" />
-      ))}
-    </svg>
-  )
-}
-
-/** A face-up Dragonheart card: grey border, silver filigree frame, painted art, corner values. */
+/** A face-up Dragonheart card: the clipped board art (frame included) plus corner value squares. */
 export function Card({ id, size, style }: { id: string; size: number; style?: CSSProperties }) {
   const def = CARD_BY_ID[id]
   const kind = def?.kind ?? 'treasure'
+  const pts = def?.points ?? 0
   return (
     <div
       className="dh-card"
@@ -118,36 +100,22 @@ export function Card({ id, size, style }: { id: string; size: number; style?: CS
         width: size,
         height: size * CARD_RATIO,
         fontSize: size / 10,
-        borderRadius: '0.6em',
-        background: 'linear-gradient(160deg, #d9d6d0, #bfbab2)',
+        borderRadius: CARD_RADIUS,
         overflow: 'hidden',
+        background: '#2a2622',
         ...style,
       }}
     >
-      {/* silver filigree frame */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: '0.42em',
-          borderRadius: '0.3em',
-          border: '0.14em solid #8e9399',
-          boxShadow: 'inset 0 0 0 0.08em #eef0f2, 0 0 0 0.06em #5b5f64',
-          background: '#2a2622',
-          overflow: 'hidden',
-        }}
-      >
-        <img
-          src={CARD_IMG[kind]}
-          alt=""
-          draggable={false}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      </div>
-      <DragonEdge />
-      <Corner points={def?.points ?? 0} kind={kind} pos={{ left: '0.62em', top: '0.62em' }} />
-      <Corner points={def?.points ?? 0} kind={kind} pos={{ right: '0.62em', top: '0.62em' }} />
-      <Corner points={def?.points ?? 0} kind={kind} flip pos={{ left: '0.62em', bottom: '0.62em' }} />
-      <Corner points={def?.points ?? 0} kind={kind} flip pos={{ right: '0.62em', bottom: '0.62em' }} />
+      <img
+        src={CARD_IMG[kind]}
+        alt=""
+        draggable={false}
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }}
+      />
+      <Corner points={pts} kind={kind} pos={{ left: '0.7em', top: '0.7em' }} />
+      <Corner points={pts} kind={kind} pos={{ right: '0.7em', top: '0.7em' }} />
+      <Corner points={pts} kind={kind} flip pos={{ left: '0.7em', bottom: '0.7em' }} />
+      <Corner points={pts} kind={kind} flip pos={{ right: '0.7em', bottom: '0.7em' }} />
     </div>
   )
 }
@@ -162,7 +130,7 @@ export function CardBack({ deck, size, style }: { deck: DeckColor; size: number;
         width: size,
         height: size * CARD_RATIO,
         fontSize: size / 10,
-        borderRadius: '0.6em',
+        borderRadius: CARD_RADIUS,
         background: 'linear-gradient(160deg, #d9d6d0, #bfbab2)',
         overflow: 'hidden',
         ...style,
@@ -171,8 +139,8 @@ export function CardBack({ deck, size, style }: { deck: DeckColor; size: number;
       <div
         style={{
           position: 'absolute',
-          inset: '0.42em',
-          borderRadius: '0.3em',
+          inset: '0.32em',
+          borderRadius: '0.28em',
           border: '0.1em solid #8e9399',
           overflow: 'hidden',
           background: DECK_FIELD[deck].base,
@@ -189,15 +157,64 @@ export function CardBack({ deck, size, style }: { deck: DeckColor; size: number;
   )
 }
 
-/** The red plastic Great Dragon figure. */
+/**
+ * The Great Dragon token: a flat painted medallion (gold rim, deep red enamel, a gold dragon
+ * curled around the ruby Dragonheart), not a realistic figure, so it matches the board's art.
+ */
 export function GreatDragon({ size, style }: { size: number; style?: CSSProperties }) {
   return (
-    <img
-      src={FIGURE_IMG}
-      alt="The Great Dragon"
-      draggable={false}
-      style={{ width: size, height: size, objectFit: 'contain', filter: 'drop-shadow(0 0.4em 0.5em rgba(0,0,0,.55))', fontSize: size / 10, ...style }}
-    />
+    <svg
+      viewBox="0 0 120 120"
+      width={size}
+      height={size}
+      role="img"
+      aria-label="The Great Dragon"
+      style={{ display: 'block', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,.55))', ...style }}
+    >
+      <defs>
+        <radialGradient id="dh-gd-rim" cx="40%" cy="35%" r="70%">
+          <stop offset="0" stopColor="#fff2b0" />
+          <stop offset="0.45" stopColor="#e2b23c" />
+          <stop offset="1" stopColor="#8a5a12" />
+        </radialGradient>
+        <radialGradient id="dh-gd-enamel" cx="45%" cy="40%" r="65%">
+          <stop offset="0" stopColor="#b3221e" />
+          <stop offset="0.7" stopColor="#7a1010" />
+          <stop offset="1" stopColor="#4a0808" />
+        </radialGradient>
+        <linearGradient id="dh-gd-gold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fbe7a1" />
+          <stop offset="0.5" stopColor="#d9a63a" />
+          <stop offset="1" stopColor="#a8741c" />
+        </linearGradient>
+        <radialGradient id="dh-gd-ruby" cx="40%" cy="35%" r="65%">
+          <stop offset="0" stopColor="#ffd0d0" />
+          <stop offset="0.35" stopColor="#ff3b3b" />
+          <stop offset="1" stopColor="#7d0000" />
+        </radialGradient>
+      </defs>
+      <circle cx="60" cy="60" r="58" fill="url(#dh-gd-rim)" />
+      <circle cx="60" cy="60" r="58" fill="none" stroke="#5c3a08" strokeWidth="2" />
+      {Array.from({ length: 24 }, (_, i) => {
+        const a = (i / 24) * Math.PI * 2
+        return <circle key={i} cx={60 + Math.cos(a) * 52.5} cy={60 + Math.sin(a) * 52.5} r="1.6" fill="#fff4c4" opacity="0.8" />
+      })}
+      <circle cx="60" cy="60" r="47" fill="url(#dh-gd-enamel)" stroke="#5c3a08" strokeWidth="1.5" />
+      {/* the dragon: a gold serpent curling around the heart, head at top-left, wing on the right */}
+      <path
+        d="M36 40 C 30 30, 44 22, 52 30 C 58 36, 54 44, 48 46 C 34 52, 30 72, 44 84 C 58 96, 82 90, 88 74 C 92 62, 84 52, 76 54"
+        fill="none"
+        stroke="url(#dh-gd-gold)"
+        strokeWidth="6.5"
+        strokeLinecap="round"
+      />
+      <path d="M33 37 l-7 -3 l5 6 z M40 30 l-2 -8 l5 6 z" fill="url(#dh-gd-gold)" />
+      <circle cx="44" cy="33" r="1.6" fill="#4a0808" />
+      <path d="M78 34 C 88 26, 98 30, 100 40 C 94 38, 90 42, 92 48 C 86 44, 82 46, 80 52 C 78 46, 74 42, 78 34 Z" fill="url(#dh-gd-gold)" opacity="0.95" />
+      {/* the Dragonheart */}
+      <path d="M60 52 l11 11 l-11 15 l-11 -15 z" fill="url(#dh-gd-ruby)" stroke="#fde68a" strokeWidth="1.6" />
+      <path d="M60 52 l-11 11 h22 z" fill="#ffffff" opacity="0.22" />
+    </svg>
   )
 }
 

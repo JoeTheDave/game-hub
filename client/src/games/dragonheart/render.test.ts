@@ -3,7 +3,9 @@ import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { dragonheartModule, tableView, type DragonheartAction, type DragonheartState } from '@games/dragonheart/engine'
 import { seededRng, type SeatInfo } from '@games/types'
-import { TableView, planAnimation, MAX_TURN_MS, tagText } from './TableView'
+import { TableView, planAnimation, MAX_TURN_MS, noteText } from './TableView'
+import { slotRect } from './layout'
+import { flyerZ } from './flyers'
 import { PhoneView } from './PhoneView'
 import type { GameInstance } from '../../types/game'
 
@@ -62,22 +64,91 @@ describe('dragonheart views render', () => {
   })
 })
 
-describe('stack tags', () => {
-  it('shows count and total on stacks and the pile below the Ship, total only on capacity spaces, nothing when empty', () => {
-    expect(tagText('treasure', 3, 7)).toEqual({ count: '×3', points: '7 pts' })
-    expect(tagText('belowShip', 1, 1)).toEqual({ count: '×1', points: '1 pt' })
-    expect(tagText('dwarf', 2, 5)).toEqual({ count: null, points: '5 pts' })
-    expect(tagText('fireDragon', 0, 0)).toBeNull()
+describe('stack notes', () => {
+  it('shows a subtle "count · points" only for 2 or more cards', () => {
+    expect(noteText(3, 7)).toBe('3 · 7')
+    expect(noteText(2, 0)).toBe('2 · 0')
+    expect(noteText(1, 4)).toBeNull()
+    expect(noteText(0, 0)).toBeNull()
   })
 
-  it('renders a tag on the TV for every occupied space', () => {
+  it('renders a note on the TV for every space holding 2+ cards, and no post-it tags', () => {
     const snaps = play(7)
-    const mid = snaps[1]
-    const tv = tableView(mid, seats)
-    const html = renderToString(createElement(TableView, { instance, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound }))
-    const occupied = Object.values(tv.spaces).filter((sv) => sv.count > 0).length + (tv.belowShip.count > 0 ? 1 : 0)
-    expect(occupied).toBeGreaterThan(0)
-    expect((html.match(/class="dh-tag"/g) ?? []).length).toBe(occupied)
+    for (const st of snaps) {
+      const tv = tableView(st, seats)
+      const html = renderToString(createElement(TableView, { instance, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound }))
+      const multi = Object.values(tv.spaces).filter((sv) => sv.count >= 2).length + (tv.belowShip.count >= 2 ? 1 : 0)
+      expect((html.match(/dh-stacknote/g) ?? []).length).toBe(multi)
+      expect(html).not.toContain('dh-tag')
+    }
+  })
+})
+
+/** A minimal table view for planner tests. */
+function fakeView(spaces: Partial<Record<string, string[]>>) {
+  const all = ['treasure', 'fireDragon', 'petrified', 'sorceress', 'troll', 'dwarf', 'knight', 'huntress', 'ship']
+  return {
+    spaces: Object.fromEntries(all.map((k) => [k, { count: spaces[k]?.length ?? 0, visible: spaces[k] ?? [], points: 0 }])),
+    belowShip: { count: 0, visible: [], points: 0 },
+    shipStacks: [],
+    greatDragon: 'board',
+    players: [0, 1].map((seat) => ({ seat, name: `P${seat}`, color: null, deck: seat ? 'red' : 'green', handCount: 5, deckCount: 30, scoreCount: 0, handMax: 5, hasDragon: false })),
+    turn: 0,
+    firstPlayer: 0,
+    endAfterSeat: null,
+    finalTurn: false,
+    lastPlay: null,
+    result: null,
+    finished: false,
+  } as never
+}
+
+describe('layering: a played card always lands on top', () => {
+  it('the completing 4th Dwarf lands in the front outline above the other three, and stays on top as the set is collected', () => {
+    const prev = fakeView({ dwarf: ['g-20', 'g-21', 'r-22'] })
+    const next = fakeView({})
+    const events = [
+      { type: 'cardsPlayed', seat: 0, space: 'dwarf', cardIds: ['g-23'] },
+      { type: 'cardsCollected', seat: 0, from: 'dwarf', count: 4, visibleIds: ['g-20', 'g-21', 'r-22', 'g-23'] },
+    ]
+    const plan = planAnimation(events, prev, next, false)
+    const landing = plan.flyers[0]
+    const front = slotRect('dwarf', 3)
+    expect(landing.to).toEqual(front)
+    const others = plan.flyers.filter((f) => f !== landing && f.appear !== false)
+    expect(others.length).toBe(3)
+    for (const o of others) expect(flyerZ(landing)).toBeGreaterThan(flyerZ(o))
+    const continued = plan.flyers.find((f) => f.appear === false)!
+    for (const o of others) expect(flyerZ(continued)).toBeGreaterThan(flyerZ(o))
+  })
+
+  it('every capacity space: each successive play lands above the cards already there', () => {
+    for (const [space, cap] of [['knight', 2], ['huntress', 3], ['ship', 3], ['dwarf', 4]] as const) {
+      for (let before = 1; before < cap; before++) {
+        const ids = Array.from({ length: before }, (_, i) => `g-${String(10 + i).padStart(2, '0')}`)
+        const plan = planAnimation([{ type: 'cardsPlayed', seat: 0, space, cardIds: ['r-40'] }], fakeView({ [space]: ids }), fakeView({ [space]: [...ids, 'r-40'] }), false)
+        const f = plan.flyers[0]
+        expect(f.to).toEqual(slotRect(space, before))
+        // the board draws existing cards at z 2..; flyers sit above every board card
+        expect(flyerZ(f)).toBeGreaterThan(2 + cap)
+        expect(plan.hidden).toContain(`slot-${space}-${before}`)
+      }
+    }
+  })
+
+  it('a stack keeps showing its previous top under the incoming card until it lands', () => {
+    const plan = planAnimation(
+      [{ type: 'cardsPlayed', seat: 1, space: 'treasure', cardIds: ['r-01', 'r-02'] }],
+      fakeView({ treasure: ['g-01'] }),
+      fakeView({ treasure: ['g-01', 'r-01', 'r-02'] }),
+      false
+    )
+    const ghost = plan.flyers.find((f) => f.from === f.to)!
+    const incoming = plan.flyers.filter((f) => f !== ghost)
+    expect(incoming.length).toBe(2)
+    for (const f of incoming) expect(flyerZ(f)).toBeGreaterThan(flyerZ(ghost))
+    expect(flyerZ(incoming[1])).toBeGreaterThan(flyerZ(incoming[0]))
+    expect(ghost.vanishAt).toBeCloseTo(incoming[1].delay + incoming[1].duration)
   })
 })
 
@@ -110,7 +181,7 @@ describe('animation planning', () => {
         if (events.some((e) => e.type === 'movedBelowShip' || e.type === 'shipStackFormed')) {
           expect(chained.length).toBeGreaterThan(0)
           const starts = new Set(chained.map((f) => Math.round(f.delay)))
-          const vanishes = plan.flyers.filter((f) => f.vanishAt != null)
+          const vanishes = plan.flyers.filter((f) => f.vanishAt != null && f.from !== f.to)
           expect(vanishes.length).toBe(chained.length)
           for (const v of vanishes) {
             expect(v.vanishAt!).toBeGreaterThanOrEqual(v.delay + v.duration - 1)

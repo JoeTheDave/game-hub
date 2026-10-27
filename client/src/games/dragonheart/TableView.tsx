@@ -9,6 +9,8 @@ import {
   H,
   OFF_CARD,
   P_CARD,
+  noteAnchor,
+  slotZ,
   TURN_LIGHT,
   W,
   belowShipRect,
@@ -22,7 +24,6 @@ import {
   outlineRect,
   slotRect,
   spotLayout,
-  tagRect,
   zoneFor,
 } from './layout'
 import { BOARD_IMG, TABLE_IMG } from './assets'
@@ -139,8 +140,8 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         {/* The Knight/Huntress pile, lying below the Ship */}
         <PileBelowShip view={view} />
 
-        {/* Count / points tags pinned at each occupied space */}
-        <StackTags view={view} />
+        {/* An extremely subtle "count · points" under each space holding 2+ cards */}
+        <StackNotes view={view} />
 
         {/* Ship stacks beside it (the third one ends the game) */}
         {view.shipStacks.map((stack, i) => {
@@ -205,13 +206,13 @@ function SpaceCards({ space, view }: { space: Space; view: DragonheartTableView 
   const cap = CAPACITY[space]
   const sv = view.spaces[space]
   if (cap > 0) {
-    // Later cards lie on the next (lower-right) outline, on top, so every card's top-left value shows.
+    // Capacity spaces fill back (lower-right outline) to front: the newest card is frontmost, on top.
     return (
       <>
         {sv.visible.map((id, i) => {
           const r = slotRect(space, i)
           return (
-            <div key={id} data-anchor={`slot-${space}-${i}`} style={placed(local(r), { zIndex: 2 + i })}>
+            <div key={id} data-anchor={`slot-${space}-${i}`} style={placed(local(r), { zIndex: slotZ(i) })}>
               <Card id={id} size={r.w} />
             </div>
           )
@@ -268,14 +269,13 @@ function PileBelowShip({ view }: { view: DragonheartTableView }) {
   )
 }
 
-/** Stack spaces and the pile below the Ship show "×n" and their total; capacity spaces their total. */
-export function tagText(space: Space | 'belowShip', count: number, points: number): { count: string | null; points: string } | null {
-  if (count <= 0) return null
-  const stack = space === 'belowShip' || CAPACITY[space] === 0
-  return { count: stack ? `×${count}` : null, points: `${points} ${points === 1 ? 'pt' : 'pts'}` }
+/** The subtle note for a space: "count · points", only when it holds 2 or more cards. */
+export function noteText(count: number, points: number): string | null {
+  if (count < 2) return null
+  return `${count} · ${points}`
 }
 
-function StackTags({ view }: { view: DragonheartTableView }) {
+function StackNotes({ view }: { view: DragonheartTableView }) {
   const entries: [Space | 'belowShip', { count: number; points: number }][] = [
     ...SPACES.map((sp) => [sp, view.spaces[sp]] as [Space, { count: number; points: number }]),
     ['belowShip', view.belowShip],
@@ -283,29 +283,17 @@ function StackTags({ view }: { view: DragonheartTableView }) {
   return (
     <>
       {entries.map(([space, sv]) => {
-        const t = tagText(space, sv.count, sv.points)
+        const t = noteText(sv.count, sv.points)
         if (!t) return null
-        const r = tagRect(space)
-        const j = jitter(`tag-${space}`, 3, 0)
+        const a = noteAnchor(space, sv.count)
         return (
           <div
             key={space}
-            className="dh-tag"
-            style={{
-              position: 'absolute',
-              left: r.x,
-              top: r.y,
-              width: r.w,
-              height: r.h,
-              zIndex: 20,
-              transform: `rotate(${j.rot}deg)`,
-            }}
+            className="dh-numeral dh-stacknote"
+            title={`${sv.count} cards, ${sv.points} points`}
+            style={{ position: 'absolute', left: a.x - a.w / 2, top: a.y, width: a.w, zIndex: 20 }}
           >
-            <span className="dh-tag-pin" />
-            {t.count && <span className="dh-numeral dh-tag-count">{t.count}</span>}
-            <span className="dh-numeral dh-tag-points" style={{ fontSize: t.count ? 17 : 22 }}>
-              {t.points}
-            </span>
+            {t}
           </div>
         )
       })}
@@ -382,10 +370,17 @@ function FaceDownPile({ anchor, rect, count, deck }: { anchor: string; rect: Rec
 }
 
 function PlayerSpot({ p, first, finalTurn }: { p: PublicPlayer; first: boolean; finalTurn: boolean }) {
-  const s = spotLayout(zoneFor(p.seat))
+  const s = spotLayout(zoneFor(p.seat), p.seat)
   return (
     <>
-      <PlaceCard p={p} x={s.left} y={s.top} first={first} finalTurn={finalTurn} maxW={s.contentW - (p.hasDragon ? 110 : 0)} />
+      <PlaceCard
+        p={p}
+        x={p.seat === 1 && p.hasDragon ? s.left + 110 : s.left}
+        y={s.top}
+        first={first}
+        finalTurn={finalTurn}
+        maxW={s.contentW - (p.hasDragon ? 110 : 0)}
+      />
       <FaceDownPile anchor={`deck-${p.seat}`} rect={deckRect(p.seat)} count={p.deckCount} deck={p.deck} />
       {Array.from({ length: p.handCount }, (_, i) => (
         <div key={i} data-anchor={`hand-${p.seat}-${i}`} style={placed(handRect(p.seat, i, p.handCount), { zIndex: 2 })}>
@@ -515,6 +510,8 @@ const STAGGER_MS = 90
 /** Phases overlap a little so a turn flows instead of stopping between steps. */
 const OVERLAP = 140
 export const MAX_TURN_MS = 2500
+/** Flyer z for the card at stack position 0 on a space; position i flies at STACK_Z + i. */
+const STACK_Z = 10
 
 type Ev = { type: string; [k: string]: unknown }
 
@@ -528,22 +525,23 @@ export function planAnimation(
   const hidden: string[] = []
   const sounds: Sound[] = []
   /** Where a card currently is within this plan (if it already flew), so its next move chains. */
-  const at = new Map<string, { rect: Rect; arrive: number; flyer: number }>()
+  const at = new Map<string, { rect: Rect; arrive: number; flyer: number; z?: number }>()
   let k = 0
   let t = 0
   let end = 0
   const add = (f: Omit<Flyer, 'key'>, ids: string[] = []) => {
     flyers.push({ ...f, key: `f${k++}` })
     end = Math.max(end, f.delay + f.duration)
-    for (const id of ids) at.set(id, { rect: f.to, arrive: f.delay + f.duration, flyer: flyers.length - 1 })
+    for (const id of ids) at.set(id, { rect: f.to, arrive: f.delay + f.duration, flyer: flyers.length - 1, z: f.z })
   }
   /** Start a card's next move from where it currently is; chain if it arrived earlier in this plan. */
   const source = (id: string, fallback: Rect, earliest: number) => {
     const cur = at.get(id)
-    if (!cur) return { rect: fallback, delay: earliest, appear: true }
+    if (!cur) return { rect: fallback, delay: earliest, appear: true, z: undefined as number | undefined }
     const delay = Math.max(earliest, cur.arrive)
     flyers[cur.flyer].vanishAt = delay
-    return { rect: cur.rect, delay, appear: false }
+    // A card that moves again keeps its stacking order (the newest card stays on top).
+    return { rect: cur.rect, delay, appear: false, z: cur.z }
   }
   const phase = () => {
     t = Math.max(t, end - OVERLAP)
@@ -557,9 +555,17 @@ export function planAnimation(
         const ids = e.cardIds as string[]
         const n0 = prev.players.find((p) => p.seat === seat)?.handCount ?? ids.length
         const before = prev.spaces[space].count
+        const cap = CAPACITY[space]
+        // A stack shows only its top card, which this play replaces: keep the previous top in view
+        // (under the incoming card) until the new one lands on it.
+        const prevTop = cap > 0 ? undefined : prev.spaces[space].visible[prev.spaces[space].visible.length - 1]
+        if (prevTop) {
+          const r = slotRect(space, 0)
+          const lands = t + (ids.length - 1) * STAGGER_MS + CARD_FLY
+          add({ from: r, to: r, node: <Card id={prevTop} size={r.w} />, delay: 0, duration: lands, vanishAt: lands, z: STACK_Z + before - 1 })
+        }
         ids.forEach((id, j) => {
           const from = handRect(seat, Math.max(0, n0 - ids.length + j), n0)
-          const cap = CAPACITY[space]
           const to = slotRect(space, cap > 0 ? before + j : 0)
           const deck = deckOf(id)
           add(
@@ -571,6 +577,8 @@ export function planAnimation(
               duration: CARD_FLY,
               flip: true,
               lift: 70,
+              // Its stack position: always above every card already on the space.
+              z: STACK_Z + before + j,
             },
             [id]
           )
@@ -591,7 +599,7 @@ export function planAnimation(
             ? visible.map((id, i) => ({ id, rect: slotRect(from as Space, i) }))
             : [{ id: visible[visible.length - 1] ?? '', rect: from === 'belowShip' ? belowShipRect() : slotRect(from as Space, 0) }]
         pieces.forEach((pc, i) => {
-          const src = pc.id ? source(pc.id, pc.rect, t + i * STAGGER_MS) : { rect: pc.rect, delay: t + i * STAGGER_MS, appear: true }
+          const src = pc.id ? source(pc.id, pc.rect, t + i * STAGGER_MS) : { rect: pc.rect, delay: t + i * STAGGER_MS, appear: true, z: undefined }
           const face = pc.id ? <Card id={pc.id} size={to.w} /> : <CardBack deck={prev.players[seat]?.deck ?? 'green'} size={to.w} />
           add(
             {
@@ -603,6 +611,7 @@ export function planAnimation(
               flip: true,
               lift: 80,
               appear: src.appear,
+              z: src.z ?? STACK_Z + i,
             },
             pc.id ? [pc.id] : []
           )
@@ -615,7 +624,7 @@ export function planAnimation(
       case 'greatDragonMoved': {
         const from = dragonRect(e.from as 'board' | number)
         const to = dragonRect(e.to as 'board' | number)
-        add({ from, to, node: <GreatDragon size={to.w} />, delay: t, duration: DRAGON_FLY, lift: 120 })
+        add({ from, to, node: <GreatDragon size={to.w} />, delay: t, duration: DRAGON_FLY, lift: 120, z: 90 })
         hidden.push('dragon')
         sounds.push({ name: 'dragon-rumble', at: t })
         phase()
@@ -626,7 +635,7 @@ export function planAnimation(
         const n0 = prev.players.find((p) => p.seat === seat)?.handCount ?? 1
         const deck = prev.players.find((p) => p.seat === seat)?.deck ?? 'green'
         const to = deckRect(seat)
-        add({ from: handRect(seat, Math.max(0, n0 - 1), n0), to, node: <CardBack deck={deck} size={to.w} />, delay: t, duration: CARD_FLY, lift: 50 })
+        add({ from: handRect(seat, Math.max(0, n0 - 1), n0), to, node: <CardBack deck={deck} size={to.w} />, delay: t, duration: CARD_FLY, lift: 50, z: 80 })
         sounds.push({ name: 'card-slide', at: t, volume: 0.8 })
         phase()
         break
@@ -637,7 +646,7 @@ export function planAnimation(
         const to = belowShipRect()
         ids.forEach((id, i) => {
           const src = source(id, slotRect(from, i), t + i * STAGGER_MS)
-          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear }, [id])
+          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
         })
         hidden.push('belowShip')
         sounds.push({ name: 'card-slide', at: t })
@@ -650,7 +659,7 @@ export function planAnimation(
         const to = shipStackRect(index)
         ids.forEach((id, i) => {
           const src = source(id, slotRect('ship', i), t + i * STAGGER_MS)
-          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear }, [id])
+          add({ from: src.rect, to, node: <Card id={id} size={to.w} />, delay: src.delay, duration: CARD_FLY, lift: 50, appear: src.appear, z: src.z ?? STACK_Z + i }, [id])
         })
         hidden.push(`shipstack-${index}`)
         sounds.push({ name: 'ship-bell', at: t })
@@ -666,7 +675,7 @@ export function planAnimation(
         for (let i = 0; i < count; i++) {
           const idx = n1 - count + i
           const to = handRect(seat, idx, n1)
-          add({ from: deckRect(seat), to, node: <CardBack deck={deck} size={to.w} />, delay: t + i * STAGGER_MS, duration: DRAW_FLY, lift: 30 })
+          add({ from: deckRect(seat), to, node: <CardBack deck={deck} size={to.w} />, delay: t + i * STAGGER_MS, duration: DRAW_FLY, lift: 30, z: 80 + i })
           hidden.push(`hand-${seat}-${idx}`)
         }
         if (count > 0) sounds.push({ name: 'card-slide', at: t, volume: 0.6 })

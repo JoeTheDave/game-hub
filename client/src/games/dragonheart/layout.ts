@@ -8,9 +8,9 @@ import geometry from './boardGeometry.json'
  * so the table renders from it AND animations plan flights from it — flights land exactly where
  * the piece is drawn, with no DOM measuring.
  *
- * The board's spaces come from `boardGeometry.json`: outline rects measured from the scan of
- * Joe's real board, normalized to the repainted panorama (spec 1793038854620, iteration 1). The
- * outlines and arrows are painted into the art, so cards simply sit inside those rects.
+ * The board is Joe's own board image; its spaces come from `boardGeometry.json`, outline rects
+ * measured on that image (spec 1793038854620, iteration 2). The outlines and arrows are painted
+ * into the art. A card is exactly the outline's size, so a card on the board fills its outline.
  */
 export const W = 1920
 export const H = 1080
@@ -40,23 +40,18 @@ function outlinePx(o: NRect): NRect {
   return { x: BOARD.x + o.x * BOARD.w, y: BOARD.y + o.y * BOARD.h, w: o.w * BOARD.w, h: o.h * BOARD.h }
 }
 
-/** How much of the printed outline a card fills (the outline's flourishes sit just outside the card). */
-const FILL = 0.96
-
 /**
- * The card rect that sits inside an outline. Portrait outlines hold an upright card; landscape
+ * The card rect that fills an outline exactly. Portrait outlines hold an upright card; landscape
  * outlines (Petrified Dragon, the pile below the Ship) hold a card turned 90°, so the Rect is the
- * card's own (portrait) box centred on the outline, rotated by `r`.
+ * card's own (portrait) box centred on the outline, rotated by `r`. No jitter: a card on the
+ * board sits squarely in its painted outline.
  */
-function cardInOutline(o: NRect, orientation: 'portrait' | 'landscape', key: string): Rect {
-  const long = orientation === 'portrait' ? o.h : o.w
-  const short = orientation === 'portrait' ? o.w : o.h
-  const w = Math.min(short, long / CARD_RATIO) * FILL
-  const h = w * CARD_RATIO
+function cardInOutline(o: NRect, orientation: 'portrait' | 'landscape'): Rect {
+  const w = orientation === 'portrait' ? o.w : o.h
+  const h = orientation === 'portrait' ? o.h : o.w
   const cx = o.x + o.w / 2
   const cy = o.y + o.h / 2
-  const r = (orientation === 'landscape' ? 90 : 0) + jitter(key, 1, 0).rot
-  return { x: cx - w / 2, y: cy - h / 2, w, h, r }
+  return { x: cx - w / 2, y: cy - h / 2, w, h, r: orientation === 'landscape' ? 90 : 0 }
 }
 
 /** The outline rect for outline `i` of a space, in canvas pixels. */
@@ -65,10 +60,26 @@ export function outlineRect(space: Space | 'belowShip', i = 0): NRect {
   return outlinePx(outlines[Math.min(i, outlines.length - 1)])
 }
 
-/** The card rect for outline `i` of a space (a stack space has only outline 0). */
+/**
+ * Which outline the `i`-th card on a space (in play order, 0 = first played) lies in. Capacity
+ * spaces fill BACK to FRONT: the first card takes the back-most (lower-right) outline and each
+ * newer card the next one forward, so the newest card is always the frontmost, on top. Stack
+ * spaces have a single outline.
+ */
+export function outlineIndexFor(space: Space, i: number): number {
+  const cap = CAPACITY[space]
+  if (cap <= 0) return 0
+  return Math.max(0, cap - 1 - Math.min(i, cap - 1))
+}
+
+/** The card rect for the `i`-th card (play order) on a space; it fills its outline exactly. */
 export function slotRect(space: Space, i = 0): Rect {
-  const k = CAPACITY[space] > 0 ? i : 0
-  return cardInOutline(outlineRect(space, k), GEO.spaces[space].orientation, `slot-${space}-${k}`)
+  return cardInOutline(outlineRect(space, outlineIndexFor(space, i)), GEO.spaces[space].orientation)
+}
+
+/** Stacking order of the `i`-th card on a space: later cards lie on top of earlier ones. */
+export function slotZ(i: number): number {
+  return 2 + i
 }
 
 /** On-screen bounding box of a (possibly 90°-turned) rect. */
@@ -80,7 +91,7 @@ export function boundsOf(r: Rect): NRect {
   return { x: cx - r.h / 2, y: cy - r.w / 2, w: r.h, h: r.w }
 }
 
-export const DRAGON_BOARD_SIZE = 130
+export const DRAGON_BOARD_SIZE = 120
 /** The Great Dragon's starting spot: the open ground under the tree, right of the Petrified Dragon. */
 export function boardDragonRect(): Rect {
   const [nx, ny] = GEO.greatDragonStart.center
@@ -92,7 +103,7 @@ export function boardDragonRect(): Rect {
 // ——— Below the board: the Knight/Huntress pile (under the Ship) and the ship stacks ———
 /** The Knight/Huntress pile lies in the landscape outline the board's curved arrows point to. */
 export function belowShipRect(): Rect {
-  return cardInOutline(outlineRect('belowShip'), GEO.spaces.belowShip.orientation, 'belowShip')
+  return cardInOutline(outlineRect('belowShip'), GEO.spaces.belowShip.orientation)
 }
 
 export const OFF_CARD = 110
@@ -104,8 +115,11 @@ export function shipStackRect(i: number): Rect {
   return { x: pile.x + pile.w + 30 + i * (OFF_CARD + STACK_GAP), y, w: OFF_CARD, h: OFF_CARD_H, r: jitter(`shipstack-${i}`, 2.5, 0).rot }
 }
 
-// ——— Players: bottom-left (seat 0, green) and bottom-right (seat 1, red), identical geometry ———
-/** Each seat owns the open table from the screen edge to the pile/ship stacks in the middle. */
+// ——— Players: bottom-left (seat 0, green) and bottom-right (seat 1, red), mirrored geometry ———
+/**
+ * Each seat owns the open table from the screen edge to the pile below the Ship (left) or the
+ * ship stacks (right): the same width on both sides, so margins match.
+ */
 export const ZONE_W = 520
 export interface Zone {
   x: number
@@ -118,60 +132,80 @@ export function zoneFor(seat: number): Zone {
   return { x: seat === 0 ? 0 : W - ZONE_W, y, w: ZONE_W, h: H - y - 8 }
 }
 
-export const P_CARD = 96
+/** Hand backs: as big as the zone allows (Joe: use the free table, don't shrink anything else). */
+export const P_CARD = 190
 export const P_CARD_H = P_CARD * CARD_RATIO
-const P_GAP = 20
-export const FAN_STEP = 28
+/** Draw deck and score pile (stacked at the outer side of the zone). */
+export const PILE_CARD = 104
+export const PILE_CARD_H = PILE_CARD * CARD_RATIO
+const PILE_GAP = 12
+const COL_GAP = 24
+export const FAN_STEP = 30
 const FAN_W = P_CARD + 5 * FAN_STEP
 const NAME_ROW = 58
-export const DRAGON_SEAT_SIZE = 92
+const NAME_GAP = 12
+export const DRAGON_SEAT_SIZE = 100
 
 /**
- * Inside a zone: [deck] [hand fan] [score pile] across, with the name card (and the Great Dragon
- * when held) above. The whole group is centred, so the table between the group and the screen
- * edge equals the table between the group and the central area.
+ * Inside a zone: the name card across the top; below it the piles column (draw deck over score
+ * pile) on the OUTER side and the hand fan on the inner side. The group is centred, so the table
+ * between it and the screen edge equals the table between it and the central area.
  */
-export function spotLayout(zone: Zone) {
-  const contentW = P_CARD + P_GAP + FAN_W + P_GAP + P_CARD
+export function spotLayout(zone: Zone, seat = 0) {
+  const pilesH = PILE_CARD_H * 2 + PILE_GAP
+  const cardsH = Math.max(pilesH, P_CARD_H)
+  const contentW = PILE_CARD + COL_GAP + FAN_W
+  const contentH = NAME_ROW + NAME_GAP + cardsH
   const left = zone.x + (zone.w - contentW) / 2
-  const contentH = NAME_ROW + 14 + P_CARD_H + 10
   const top = zone.y + (zone.h - contentH) / 2
-  const cardsY = top + NAME_ROW + 14
+  const cardsY = top + NAME_ROW + NAME_GAP
+  const outerRight = seat === 1
+  const pilesX = outerRight ? left + contentW - PILE_CARD : left
+  const fanX = outerRight ? left : left + PILE_CARD + COL_GAP
+  const innerRight = !outerRight
   return {
     contentW,
     contentH,
     left,
     top,
     cardsY,
-    deck: { x: left, y: cardsY, w: P_CARD, h: P_CARD_H } as Rect,
-    fanX: left + P_CARD + P_GAP,
-    score: { x: left + P_CARD + P_GAP + FAN_W + P_GAP, y: cardsY, w: P_CARD, h: P_CARD_H } as Rect,
-    dragon: { x: left + contentW - DRAGON_SEAT_SIZE, y: top + NAME_ROW - DRAGON_SEAT_SIZE + 6, w: DRAGON_SEAT_SIZE, h: DRAGON_SEAT_SIZE } as Rect,
+    fanX,
+    deck: { x: pilesX, y: cardsY, w: PILE_CARD, h: PILE_CARD_H } as Rect,
+    score: { x: pilesX, y: cardsY + PILE_CARD_H + PILE_GAP, w: PILE_CARD, h: PILE_CARD_H } as Rect,
+    /** The Great Dragon token sits at the inner end of the name row, half over the hand. */
+    dragon: {
+      x: innerRight ? left + contentW - DRAGON_SEAT_SIZE : left,
+      y: top + NAME_ROW / 2 - DRAGON_SEAT_SIZE / 2 + 6,
+      w: DRAGON_SEAT_SIZE,
+      h: DRAGON_SEAT_SIZE,
+    } as Rect,
   }
 }
 
+const seatSpot = (seat: number) => spotLayout(zoneFor(seat), seat)
+
 export function deckRect(seat: number): Rect {
-  return { ...spotLayout(zoneFor(seat)).deck, r: jitter(`deck-${seat}`, 2, 0).rot }
+  return { ...seatSpot(seat).deck, r: jitter(`deck-${seat}`, 2, 0).rot }
 }
 export function scoreRect(seat: number): Rect {
-  return { ...spotLayout(zoneFor(seat)).score, r: jitter(`score-${seat}`, 2.5, 0).rot }
+  return { ...seatSpot(seat).score, r: jitter(`score-${seat}`, 2.5, 0).rot }
 }
 /** Card `i` of a hand fan of `n` backs (fanned slightly, like cards held face-down on the table). */
 export function handRect(seat: number, i: number, n: number): Rect {
-  const s = spotLayout(zoneFor(seat))
+  const s = seatSpot(seat)
   const spread = Math.max(0, n - 1)
   const offset = ((5 - spread) * FAN_STEP) / 2 // centre the fan in its 6-card space
   const mid = spread / 2
   return {
     x: s.fanX + offset + i * FAN_STEP,
-    y: s.cardsY + Math.abs(i - mid) * 3,
+    y: s.cardsY + Math.abs(i - mid) * 4,
     w: P_CARD,
     h: P_CARD_H,
-    r: (i - mid) * 4,
+    r: (i - mid) * 3,
   }
 }
 export function seatDragonRect(seat: number): Rect {
-  return spotLayout(zoneFor(seat)).dragon
+  return seatSpot(seat).dragon
 }
 export function dragonRect(at: 'board' | number): Rect {
   return at === 'board' ? boardDragonRect() : seatDragonRect(at)
@@ -180,21 +214,22 @@ export function dragonRect(at: 'board' | number): Rect {
 /** The warm light pool under a seat's pieces (bounded to its own zone). */
 export function glowRect(seat: number) {
   const z = zoneFor(seat)
-  const s = spotLayout(z)
-  return { x: s.left - 50, y: s.top - 40, w: s.contentW + 100, h: Math.min(z.h, s.contentH + 80) }
+  const s = spotLayout(z, seat)
+  return { x: s.left - 40, y: s.top - 30, w: s.contentW + 80, h: Math.min(z.h + 20, s.contentH + 60) }
 }
 
-// ——— Stack tags: count + total points, pinned at a space's corner ———
-export const TAG = { w: 88, h: 58 }
+// ——— Stack notes: an extremely subtle "count · points" under the top card, only for 2+ cards ———
 /**
- * Where a space's tag sits: pinned over the bottom-right corner of its last outline (the
- * front-most card's corner value stays clear at the top-left). The pile below the Ship takes its
- * tag on its right end.
+ * Where a space's note sits: centred just inside the bottom edge of its top (newest) card, between
+ * the corner value squares. `count` is the number of cards on the space.
  */
-export function tagRect(space: Space | 'belowShip'): NRect {
-  const n = space === 'belowShip' ? 1 : Math.max(1, CAPACITY[space])
-  const o = outlineRect(space, n - 1)
-  return { x: o.x + o.w - TAG.w * 0.55, y: o.y + o.h - TAG.h * 0.75, w: TAG.w, h: TAG.h }
+export function noteAnchor(space: Space | 'belowShip', count: number): { x: number; y: number; w: number } {
+  if (space === 'belowShip') {
+    const o = outlineRect('belowShip')
+    return { x: o.x + o.w / 2, y: o.y + o.h - 30, w: o.w }
+  }
+  const o = outlineRect(space, outlineIndexFor(space, Math.max(0, count - 1)))
+  return { x: o.x + o.w / 2, y: o.y + o.h - 30, w: o.w }
 }
 
 export const TURN_LIGHT = { rgb: [255, 196, 112] as const, alpha: 0.5 }

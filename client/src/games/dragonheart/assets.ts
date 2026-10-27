@@ -12,5 +12,4 @@ export const SOUNDS = urls(import.meta.glob('./assets/sounds/*.mp3', { eager: tr
 export const BACK_IMG = { green: GREEN_BACK, red: RED_BACK } as const
 
 export { default as BOARD_IMG } from './assets/board/panorama.webp'
-export { default as FIGURE_IMG } from './assets/figure/great-dragon.webp'
 export { default as TABLE_IMG } from './assets/table/surface.webp'
