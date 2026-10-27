@@ -46,7 +46,7 @@ const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] curso
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
-export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError }: PhoneViewProps<SplendorPlayerView, SplendorAction>) {
+export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<SplendorPlayerView, SplendorAction>) {
   const [tab, setTab] = useState<Tab>('gems')
   const [sheet, setSheet] = useState<Sheet>(null)
   const me = view.players.find((p) => p.seat === playerOrder)
@@ -130,7 +130,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
       )}
 
       {takeover === 'finished' ? (
-        <Finished view={view} me={playerOrder} />
+        <Finished view={view} me={playerOrder} rematch={rematch} />
       ) : takeover === 'discard' && view.myPending?.kind === 'discard' ? (
         <DiscardPicker view={view} over={view.myPending.over} pending={pending} onSubmit={(tokens) => act({ type: 'discard', tokens })} />
       ) : takeover === 'noble' && view.myPending?.kind === 'noble' ? (
@@ -472,8 +472,9 @@ function NobleChoice({ options, pending, onPick }: { options: string[]; pending:
   )
 }
 
-function Finished({ view, me }: { view: SplendorPlayerView; me: number }) {
+function Finished({ view, me, rematch }: { view: SplendorPlayerView; me: number; rematch?: () => Promise<boolean> }) {
   const r = view.result
+  const [starting, setStarting] = useState(false)
   if (!r) return null
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 p-4">
@@ -500,6 +501,20 @@ function Finished({ view, me }: { view: SplendorPlayerView; me: number }) {
           )
         })}
       </div>
+      {rematch && (
+        <button
+          type="button"
+          disabled={starting}
+          onClick={async () => {
+            setStarting(true)
+            await rematch()
+            setStarting(false)
+          }}
+          className={`${primaryBtn} w-full max-w-sm py-3.5 text-lg mt-1`}
+        >
+          {starting ? 'Starting…' : 'Rematch'}
+        </button>
+      )}
     </div>
   )
 }

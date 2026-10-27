@@ -35,6 +35,12 @@ export interface PhoneViewProps<V = unknown, A = unknown> {
   /** The last rejection message from the engine/server, or null. */
   error: string | null
   clearError: () => void
+  /**
+   * Present only on the admin's phone (seat 0) once the game is over. Starts a brand-new game with
+   * the same players (no lobby). Show a Rematch button on the end screen when it's set. Resolves
+   * true on success; on failure the message appears in `error`.
+   */
+  rematch?: () => Promise<boolean>
 }
 
 export interface ClientGameModule {

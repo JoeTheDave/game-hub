@@ -472,13 +472,8 @@ function PlaceCard({ p, x, y, first, finalTurn, maxW }: { p: PublicPlayer; x: nu
   )
 }
 
-/** The headline for the end of the game, by who won (none when red wins: Joe dropped "sleeps forever"). */
-export function verdict(view: DragonheartTableView): string | null {
-  const w = view.result?.winners ?? []
-  if (w.length !== 1) return 'Neither side prevails — the Great Dragon stirs, and sleeps'
-  const winner = view.players.find((p) => p.seat === w[0])
-  return winner?.deck === 'green' ? 'The Great Dragon is free!' : null
-}
+/** The end-of-game headline (Joe: always "Final Score", whoever won). */
+export const FINAL_HEADLINE = 'Final Score'
 
 function Standings({ view }: { view: DragonheartTableView }) {
   const r = view.result!
@@ -499,26 +494,21 @@ function Standings({ view }: { view: DragonheartTableView }) {
         <div className="dh-title" style={{ fontSize: 52, textAlign: 'center' }}>
           Dragonheart
         </div>
-        {verdict(view) ? (
-          <div className="dh-serif" style={{ fontSize: 26, textAlign: 'center', margin: '6px 0 20px' }}>
-            {verdict(view)}
-          </div>
-        ) : (
-          <div style={{ height: 20 }} />
-        )}
+        <div className="dh-serif" style={{ fontSize: 26, textAlign: 'center', margin: '6px 0 20px' }}>
+          {FINAL_HEADLINE}
+        </div>
         {view.players.map((p) => {
           const won = r.winners.includes(p.seat)
-          const pile = r.scorePiles[p.seat] ?? []
           return (
             <div key={p.seat} className="dh-serif" style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 32, padding: '6px 0' }}>
-              <span style={{ width: 18, height: 18, borderRadius: 3, background: p.deck === 'green' ? '#2f8a3a' : '#a32020' }} />
-              <span style={{ flex: 1 }}>
-                {won ? '👑 ' : ''}
-                {p.name}
+              {/* The winner's crown has its own column, so every row's colour square lines up. */}
+              <span data-crown-cell="" style={{ width: 40, flexShrink: 0, textAlign: 'center' }}>
+                {won ? '👑' : ''}
               </span>
+              <span style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 3, background: p.deck === 'green' ? '#2f8a3a' : '#a32020' }} />
+              <span style={{ flex: 1 }}>{p.name}</span>
               {p.hasDragon && <GreatDragon size={44} />}
               <span>{r.scores[p.seat]} pts</span>
-              <span style={{ fontSize: 20, opacity: 0.7, width: 120, textAlign: 'right' }}>{pile.length} cards</span>
             </div>
           )
         })}

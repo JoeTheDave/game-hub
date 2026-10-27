@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '../lib/api'
 import { useLiveSubscription } from './useSocket'
 import type { GameEvent, GameInstance, TableUpdate } from '../types/game'
-import { shouldAdvance } from '../lib/tableQueue'
+import { isFreshStart, shouldAdvance } from '../lib/tableQueue'
 
 /** If a view never reports its animation finished, move on anyway after this long. */
 const MAX_ANIMATION_MS = 4000
@@ -21,6 +21,8 @@ export function useTableFeed(id: string | null) {
   const seqRef = useRef(0)
   /** seq of the update whose animation already finished (done() may arrive before the next update). */
   const finishedSeqRef = useRef(-1)
+  /** Phase of the newest known state, to spot a rematch (finished → fresh game). */
+  const phaseRef = useRef<string | null>(null)
 
   const resync = useCallback(async () => {
     if (!id) return
@@ -33,6 +35,7 @@ export function useTableFeed(id: string | null) {
       const instance = (await res.json()) as GameInstance
       if (instance.version <= versionRef.current) return
       versionRef.current = instance.version
+      phaseRef.current = instance.phase
       setQueue([{ instance, events: [], seq: ++seqRef.current }])
     } catch {
       // offline; the next reconnect/visibility/poll tick retries
@@ -53,7 +56,11 @@ export function useTableFeed(id: string | null) {
         const { instance, events, version } = payload as { instance: GameInstance; events: GameEvent[]; version: number }
         if (version <= versionRef.current) return
         versionRef.current = version
-        setQueue((q) => [...q, { instance, events: events ?? [], seq: ++seqRef.current }])
+        const fresh = isFreshStart(phaseRef.current, instance.phase)
+        phaseRef.current = instance.phase
+        // A rematch replaces the table outright: no flights from the old game's pieces.
+        if (fresh) setQueue([{ instance, events: [], seq: ++seqRef.current }])
+        else setQueue((q) => [...q, { instance, events: events ?? [], seq: ++seqRef.current }])
       },
     },
     resync: () => void resync(),

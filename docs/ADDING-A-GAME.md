@@ -53,6 +53,7 @@ Two specs: one for the game, plus a framework spec iteration if the game needs t
   - Server: join with a seat `joinToken`, the lobby, and Start (the host or seat 0; it appears on seat 0's phone once `players >= minPlayers`; no "admin" label).
   - Server: versioned optimistic writes, and per-viewer socket rooms.
   - Client: the TV feed queue (`useTableFeed`), reconnect resync, `SoundBoard` (audio unlock tap, mute), and the phone shell.
+- **Rematch:** `POST /games/instances/:id/rematch` (seat 0's token or the host) re-runs `setup` for the same players on a finished game: same instance, join code and seat tokens, no lobby. The TV feed treats finished → fresh as a new table, with no animation. Games only render the button: `PhoneViewProps.rematch` is set on seat 0's phone once the game is over.
 - **Game screens aren't selectable:** the TV shell and the phone shell carry `.game-surface` (`client/src/index.css`), so nothing can be selected by click-and-drag and images can't be dragged out. Inputs (and `.select-text`) opt back in. Don't undo this in a game's CSS.
 - If a game needs something the contract doesn't have, extend the contract in a framework spec iteration. Prove that **every existing game's test suite still passes**.
 
@@ -77,6 +78,7 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **Portrait first, never scrolls** (the phone shell is fixed full-viewport), 16px inputs (to stop iOS zooming), safe areas respected.
 - **The default tab is the most common action** (Splendor: Gems).
 - **The phone always shows what the player could do,** even off-turn (e.g. affordable marks). Off-turn, action buttons are hidden but browsing works. Pending sub-steps (discard, choose) take over the screen.
+- **End screen:** final standings, a crown in its own column for the winner(s), and a **Rematch** button whenever `rematch` is provided (seat 0 only). No "Game Over" heading. Disable the button while it's starting.
 - **Uses the same composed components and art as the TV.** Light haptics; sound plays on the TV only.
 - **Buttons:** active = `cursor-pointer`; disabled = faded + `cursor-default`, never `cursor-not-allowed`.
 

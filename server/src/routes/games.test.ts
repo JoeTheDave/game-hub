@@ -233,3 +233,54 @@ describe('lobby races and malformed ids', () => {
     expect((await request(app).post('/api/games/instances/not-a-uuid/join').send({})).status).toBe(404)
   })
 })
+
+describe('rematch', () => {
+  async function finishedGame() {
+    const g = await startedGame()
+    const moves: [number, number, number][] = [
+      [0, 0, 0],
+      [1, 1, 0],
+      [0, 0, 1],
+      [1, 1, 1],
+      [0, 0, 2], // X wins on the top row
+    ]
+    for (const [seat, row, col] of moves) {
+      const tok = seat === 0 ? g.a.joinToken : g.b.joinToken
+      const r = await request(app).post(`/api/games/instances/${g.id}/action`).send({ playerOrder: seat, joinToken: tok, action: { type: 'place', row, col } })
+      expect(r.status).toBe(200)
+    }
+    const inst = await request(app).get(`/api/games/instances/${g.id}`)
+    expect(inst.body.phase).toBe('finished')
+    return g
+  }
+
+  it('lets seat 0 start a brand-new game with the same players, without the lobby', async () => {
+    const { id, a, b } = await finishedGame()
+    const before = await prisma.gameInstance.findUniqueOrThrow({ where: { id } })
+    const res = await request(app).post(`/api/games/instances/${id}/rematch`).send({ joinToken: a.joinToken })
+    expect(res.status).toBe(200)
+    expect(res.body.phase).toBe('playing')
+    expect(JSON.stringify(res.body)).not.toContain(a.joinToken)
+    expect(JSON.stringify(res.body)).not.toContain(b.joinToken)
+    const after = await prisma.gameInstance.findUniqueOrThrow({ where: { id }, include: { players: true } })
+    expect(after.version).toBeGreaterThan(before.version)
+    // Same seats and tokens carry over: both phones can act in the new game straight away.
+    expect(after.players.map((p) => p.joinToken).sort()).toEqual([a.joinToken, b.joinToken].sort())
+    const board = (after.gameState as { state: { board: string[][] } }).state.board
+    expect(board.flat().every((c) => c === '')).toBe(true)
+    const move = await request(app).post(`/api/games/instances/${id}/action`).send({ playerOrder: 0, joinToken: a.joinToken, action: { type: 'place', row: 2, col: 2 } })
+    expect(move.status).toBe(200)
+  })
+
+  it('refuses anyone but seat 0 (or the host)', async () => {
+    const { id, b } = await finishedGame()
+    const res = await request(app).post(`/api/games/instances/${id}/rematch`).send({ joinToken: b.joinToken })
+    expect(res.status).toBe(403)
+  })
+
+  it('refuses a game that is not over yet', async () => {
+    const { id, a } = await startedGame()
+    const res = await request(app).post(`/api/games/instances/${id}/rematch`).send({ joinToken: a.joinToken })
+    expect(res.status).toBe(400)
+  })
+})

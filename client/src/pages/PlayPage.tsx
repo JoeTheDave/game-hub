@@ -17,7 +17,7 @@ export function PlayPage() {
   const { gameSlug, id } = useParams<{ gameSlug: string; id: string }>()
   const navigate = useNavigate()
   const seat = useMemo(() => (id ? loadSeat(id) : null), [id])
-  const { instance, playerView, error, loading, acceptInstance, acceptView } = useSeatFeed(id ?? null, seat)
+  const { instance, playerView, error, loading, acceptInstance, acceptView, resync } = useSeatFeed(id ?? null, seat)
   const mod = useGameModule(gameSlug)
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -61,6 +61,30 @@ export function PlayPage() {
     [id, seat, acceptView]
   )
 
+  // Rematch (seat 0 only, once the game is over): the same instance restarts, so every screen
+  // follows along over its socket with no navigation.
+  const rematch = useCallback(async () => {
+    if (!id || !seat) return false
+    setActionError(null)
+    try {
+      const res = await fetchApi(`/api/games/instances/${id}/rematch`, {
+        method: 'POST',
+        body: JSON.stringify({ joinToken: seat.joinToken }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setActionError(data.error || 'Could not start a rematch')
+        return false
+      }
+      acceptInstance(data as GameInstance)
+      void resync() // this seat's fresh playerView (the socket also pushes it)
+      return true
+    } catch {
+      setActionError('Connection problem — try again')
+      return false
+    }
+  }, [id, seat, acceptInstance, resync])
+
   if (notSeated) {
     return (
       <Message>
@@ -97,6 +121,7 @@ export function PlayPage() {
         pending={pending}
         error={actionError}
         clearError={() => setActionError(null)}
+        rematch={instance.phase === 'finished' && seat!.playerOrder === 0 ? rematch : undefined}
       />
     </div>
   )

@@ -5,7 +5,7 @@ import { CARD_BY_ID, GREAT_DRAGON_POINTS, KIND_NAMES } from '@games/dragonheart/
 import { CARD_RATIO, Card, GreatDragon, kindOf } from './components'
 import { choiceLabel, handGrid, matchingOptions, previewText, selectable, toggle } from './logic'
 import { TABLE_IMG } from './assets'
-import { verdict } from './TableView'
+import { FINAL_HEADLINE } from './TableView'
 import './dragonheart.css'
 
 function useSize<T extends HTMLElement>() {
@@ -39,7 +39,7 @@ const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] curso
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
-export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
+export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
   const [selected, setSelected] = useState<string[]>([])
   const [pileOpen, setPileOpen] = useState(false)
   const me = view.players.find((p) => p.seat === playerOrder)
@@ -62,8 +62,8 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
   }
 
   const turnName = view.players.find((p) => p.seat === view.turn)?.name ?? ''
-  let status: ReactNode
-  if (view.finished) status = 'Game over'
+  let status: ReactNode = null
+  if (view.finished) status = null // Joe: no "Game Over" heading on the phone's end screen
   else if (isMyTurn) status = <span className="text-emerald-300 font-bold">{view.finalTurn ? 'Your final turn!' : 'Your turn'}</span>
   else status = `Waiting for ${turnName}…${view.finalTurn ? ' (final turn)' : ''}`
 
@@ -91,7 +91,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
             <span className="text-amber-300 text-xs">pts</span>
           </button>
         </div>
-        <div className="mt-1.5 text-center text-sm text-amber-100/80">{status}</div>
+        {status != null && <div className="mt-1.5 text-center text-sm text-amber-100/80">{status}</div>}
       </div>
 
       {error && (
@@ -101,7 +101,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
       )}
 
       {view.finished ? (
-        <Finished view={view} me={playerOrder} />
+        <Finished view={view} me={playerOrder} rematch={rematch} />
       ) : (
         <>
           <Hand view={view} selected={selected} canAct={isMyTurn} onTap={(id) => setSelected((s) => toggle(options, s, id))} />
@@ -222,28 +222,42 @@ function ScorePileSheet({ view, onClose }: { view: DragonheartPlayerView; onClos
   )
 }
 
-function Finished({ view, me }: { view: DragonheartPlayerView; me: number }) {
+function Finished({ view, me, rematch }: { view: DragonheartPlayerView; me: number; rematch?: () => Promise<boolean> }) {
   const r = view.result!
+  const [starting, setStarting] = useState(false)
   return (
     <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 px-4">
       <div className="dh-title text-4xl">Dragonheart</div>
-      {verdict(view) && <div className="dh-serif text-lg text-center">{verdict(view)}</div>}
+      <div className="dh-serif text-lg text-center">{FINAL_HEADLINE}</div>
       <div className="w-full max-w-sm flex flex-col gap-2">
         {view.players.map((p) => (
           <div
             key={p.seat}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl ${p.seat === me ? 'bg-amber-300/20 border border-amber-300/40' : 'bg-white/5'}`}
           >
-            <span className="w-3 h-4 rounded-sm" style={{ background: p.deck === 'green' ? '#2f8a3a' : '#a32020' }} />
-            <span className="flex-1 dh-serif truncate">
-              {r.winners.includes(p.seat) ? '👑 ' : ''}
-              {p.name}
-            </span>
+            <span className="w-6 shrink-0 text-center">{r.winners.includes(p.seat) ? '👑' : ''}</span>
+            <span className="w-3 h-4 shrink-0 rounded-sm" style={{ background: p.deck === 'green' ? '#2f8a3a' : '#a32020' }} />
+            <span className="flex-1 dh-serif truncate">{p.name}</span>
             {p.hasDragon && <GreatDragon size={24} />}
             <span className="dh-numeral text-2xl">{r.scores[p.seat]}</span>
           </div>
         ))}
       </div>
+      {rematch && (
+        <button
+          type="button"
+          disabled={starting}
+          onClick={async () => {
+            setStarting(true)
+            buzz(12)
+            await rematch()
+            setStarting(false)
+          }}
+          className="mt-2 w-full max-w-sm py-3 rounded-xl bg-amber-500 text-stone-900 text-lg font-extrabold dh-serif shadow-lg shadow-amber-900/40 cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-default"
+        >
+          {starting ? 'Starting…' : 'Rematch'}
+        </button>
+      )}
     </div>
   )
 }

@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import type { PhoneViewProps } from '../types'
 import { MARK_TEXT_CLASSES, type TicTacToeAction, type TicTacToePlayerView } from './types'
 
 /** Phone controller. Portrait: info top, board below; landscape: info left, board right. Never scrolls. */
-export function PhoneView({ instance, view, playerOrder, players, sendAction, pending }: PhoneViewProps<TicTacToePlayerView, TicTacToeAction>) {
+export function PhoneView({ instance, view, playerOrder, players, sendAction, pending, error, rematch }: PhoneViewProps<TicTacToePlayerView, TicTacToeAction>) {
+  const [starting, setStarting] = useState(false)
   const colorOf = (seat: number) => {
     const color = players.find((p) => p.playerOrder === seat)?.color
     return color ? MARK_TEXT_CLASSES[color] ?? 'text-white' : 'text-white'
@@ -28,6 +30,21 @@ export function PhoneView({ instance, view, playerOrder, players, sendAction, pe
             <span className="block text-slate-500 mt-0.5">Waiting for opponent</span>
           )}
         </p>
+        {rematch && (
+          <button
+            type="button"
+            disabled={starting}
+            onClick={async () => {
+              setStarting(true)
+              await rematch()
+              setStarting(false)
+            }}
+            className="mt-3 w-full max-w-xs mx-auto [@media(orientation:landscape)]:mx-0 py-3 rounded-2xl bg-amber-500 text-slate-900 text-lg font-extrabold shadow-lg shadow-amber-500/30 cursor-pointer active:scale-[0.98] transition-transform disabled:opacity-60 disabled:cursor-default"
+          >
+            {starting ? 'Starting…' : 'Rematch'}
+          </button>
+        )}
+        {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center [@media(orientation:landscape)]:w-1/2 [@media(orientation:landscape)]:min-w-0 py-2">
         <div className="w-[min(92vw,24rem,calc(100dvh-11rem))] [@media(orientation:landscape)]:w-[min(46vw,calc(100dvh-2rem))] aspect-square grid grid-cols-3 gap-1 sm:gap-2">

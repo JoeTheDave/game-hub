@@ -215,39 +215,61 @@ router.patch('/games/instances/:id/players', async (req: Request, res: Response)
   }
 })
 
+/**
+ * Set up a fresh game for the seated players, under the instance lock (so the players read are
+ * exactly the ones set up). Start runs it from the lobby; Rematch runs it again on a finished game
+ * with the same instance, join code and seat tokens, so the TV and phones carry straight on.
+ */
+async function setUpGame(req: Request, res: Response, from: 'lobby' | 'finished') {
+  const { id } = req.params
+  const { joinToken } = req.body as { joinToken?: string }
+  const outcome = await withInstanceLock(id, async (tx) => {
+    const instance = await loadInstance(id, tx)
+    if (!instance) return { status: 404, error: 'Game not found' } as const
+    const mod = moduleFor(instance)
+    if (!mod) return { status: 400, error: 'Unknown game type' } as const
+    const isHost = sessionUserId(req) === instance.hostUserId
+    if (!isHost && !seatTokenValid(instance, 0, joinToken)) {
+      return {
+        status: 403,
+        error: from === 'lobby' ? 'Only the host or the first player can start the game' : 'Only the host or the first player can start a rematch',
+      } as const
+    }
+    const phase0 = storedState(instance).phase
+    if (from === 'lobby' && phase0 !== 'lobby') return { status: 400, error: 'Game already started or finished' } as const
+    if (from === 'finished' && phase0 !== 'finished') return { status: 400, error: 'The game is not over yet' } as const
+    if (instance.players.length < mod.minPlayers) return { status: 400, error: 'Not enough players' } as const
+    const { state, events } = mod.setup(seatInfos(instance), serverRng)
+    const phase = mod.isFinished(state) ? 'finished' : 'playing'
+    await tx.gameInstance.update({
+      where: { id },
+      data: { gameState: { phase, state } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
+    })
+    return { status: 200, events } as const
+  })
+  if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error })
+  const updated = (await loadInstance(id))!
+  broadcastInstance(updated, outcome.events)
+  res.json(lobbySafe(updated))
+}
+
 // Start: the host (session) or seat 0 (joinToken), once enough players have joined.
 router.post('/games/instances/:id/start', async (req: Request, res: Response) => {
   try {
-    const { id } = req.params
-    const { joinToken } = req.body as { joinToken?: string }
-    // Under the instance lock: the seated players read here are exactly the ones set up.
-    const outcome = await withInstanceLock(id, async (tx) => {
-      const instance = await loadInstance(id, tx)
-      if (!instance) return { status: 404, error: 'Game not found' } as const
-      const mod = moduleFor(instance)
-      if (!mod) return { status: 400, error: 'Unknown game type' } as const
-      const isHost = sessionUserId(req) === instance.hostUserId
-      if (!isHost && !seatTokenValid(instance, 0, joinToken)) {
-        return { status: 403, error: 'Only the host or the first player can start the game' } as const
-      }
-      if (storedState(instance).phase !== 'lobby') return { status: 400, error: 'Game already started or finished' } as const
-      if (instance.players.length < mod.minPlayers) return { status: 400, error: 'Not enough players' } as const
-      const { state, events } = mod.setup(seatInfos(instance), serverRng)
-      const phase = mod.isFinished(state) ? 'finished' : 'playing'
-      await tx.gameInstance.update({
-        where: { id },
-        data: { gameState: { phase, state } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
-      })
-      return { status: 200, events } as const
-    })
-    if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error })
-    const { events } = outcome
-    const updated = (await loadInstance(id))!
-    broadcastInstance(updated, events)
-    res.json(lobbySafe(updated))
+    await setUpGame(req, res, 'lobby')
   } catch (error) {
     console.error('Start game error:', error)
     res.status(500).json({ error: 'Failed to start game' })
+  }
+})
+
+// Rematch: a brand-new game with the same players, straight from the final results (no lobby).
+router.post('/games/instances/:id/rematch', async (req: Request, res: Response) => {
+  try {
+    await setUpGame(req, res, 'finished')
+  } catch (error) {
+    console.error('Rematch error:', error)
+    res.status(500).json({ error: 'Failed to start a rematch' })
   }
 })
 
