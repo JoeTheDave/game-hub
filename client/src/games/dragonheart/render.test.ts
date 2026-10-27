@@ -72,12 +72,14 @@ describe('stack notes', () => {
     expect(noteText(0, 0)).toBeNull()
   })
 
-  it('renders a note on the TV for every space holding 2+ cards, and no post-it tags', () => {
+  it('renders a note on the TV for every space holding 2+ cards worth points, and no post-it tags', () => {
     const snaps = play(7)
     for (const st of snaps) {
       const tv = tableView(st, seats)
       const html = renderToString(createElement(TableView, { instance, view: tv as never, players: [], events: [], seq: 1, onEventsDone: noop, sound }))
-      const multi = Object.values(tv.spaces).filter((sv) => sv.count >= 2).length + (tv.belowShip.count >= 2 ? 1 : 0)
+      // Zero-point piles (ships) get no note.
+      const noted = (sv: { count: number; points: number }) => sv.count >= 2 && sv.points > 0
+      const multi = Object.values(tv.spaces).filter(noted).length + (noted(tv.belowShip) ? 1 : 0)
       expect((html.match(/dh-stacknote/g) ?? []).length).toBe(multi)
       expect(html).not.toContain('dh-tag')
     }
