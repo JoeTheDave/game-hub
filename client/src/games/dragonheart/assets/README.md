@@ -97,4 +97,4 @@ Joe's board image has no arrows into the Sorceress. Iteration 5's code-drawn sil
 - the reference is aligned (offset -3, +1)
 - the mask is a band along each traced arrow path, intersected with changed pixels, kept clear of the outlines, and feathered
 
-Only about 7k pixels change (bbox x 1203–1672, y 222–334); everything else is identical. Then run `clip_cards.py <out.png>`; the card clips come out byte-identical.
+Only about 9.7k pixels change (bbox x 1203–1672, y 216–334; the head disc and a lower threshold for dark outline pixels keep both barbs outlined); everything else is identical. Then run `clip_cards.py <out.png>`; the card clips come out byte-identical.
