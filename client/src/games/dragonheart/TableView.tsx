@@ -202,7 +202,7 @@ function Board({ view }: { view: DragonheartTableView }) {
 }
 
 /** The milky overshade on the board image (cards render above it, unshaded). */
-export const BOARD_SHADE = 'rgba(255, 250, 240, 0.26)'
+export const BOARD_SHADE = 'rgba(255, 250, 240, 0.31)'
 
 /** Board-local copy of a canvas rect (pieces on the board render inside the board element). */
 const local = (r: Rect): Rect => ({ ...r, x: r.x - BOARD.x, y: r.y - BOARD.y })
