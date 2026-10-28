@@ -102,3 +102,68 @@ describe('animation planning', () => {
     expect(seen.has('cardBought')).toBe(true)
   })
 })
+
+describe('play-test round 2 UI', () => {
+  function finishedState(options?: unknown): SplendorState {
+    const rng = seededRng(21)
+    let { state } = splendorModule.setup(seats, rng, options)
+    for (let i = 0; i < 2000 && !splendorModule.isFinished(state); i++) {
+      const seat = splendorModule.activeSeats(state)[0]
+      const legal = splendorModule.legalActions(state, seat)
+      const res = splendorModule.applyAction(state, seat, legal[Math.floor(rng() * legal.length)] as SplendorAction, rng)
+      if (!res.ok) throw new Error(res.error)
+      state = res.state
+    }
+    return state
+  }
+  const phone = (s: SplendorState, seat: number) =>
+    renderToString(
+      createElement(PhoneView, {
+        instance,
+        view: splendorModule.playerView(s, seat, seats) as never,
+        playerOrder: seat,
+        me: undefined,
+        players: [],
+        sendAction: async () => true,
+        pending: false,
+        error: null,
+        clearError: noop,
+      })
+    )
+
+  it('final scores show a crown column instead of rank numbers (TV and phone)', () => {
+    const s = finishedState()
+    expect(s.result).toBeTruthy()
+    const tv = renderToString(
+      createElement(TableView, { instance, view: splendorModule.tableView(s, seats) as never, players: [], events: [], seq: 1, onEventsDone: noop, sound })
+    )
+    const crowns = tv.match(/data-crown-col/g) ?? []
+    expect(crowns).toHaveLength(3)
+    expect(tv).not.toMatch(/>\s*[123]\.\s*</)
+    const ph = phone(s, 0)
+    expect(ph.match(/data-crown-col/g) ?? []).toHaveLength(3)
+    expect(ph).toContain('👑')
+  })
+
+  it('affordable cards glow blue with no checkmark', async () => {
+    const { AFFORDABLE_GLOW, AffordableMark } = await import('./PhoneView')
+    expect(AFFORDABLE_GLOW).toContain('#60a5fa')
+    const html = renderToString(createElement(AffordableMark))
+    expect(html).toContain('data-affordable')
+    expect(html).toContain('96,165,250')
+    expect(html).not.toContain('✓')
+    expect(html).not.toContain('#86efac')
+  })
+
+  it('renders a randomized deck from the view’s card definitions, with paired portraits', () => {
+    const { state } = splendorModule.setup(seats, seededRng(8), { randomizeCards: true })
+    const view = tableView(state, seats)
+    const tv = renderToString(createElement(TableView, { instance, view: view as never, players: [], events: [], seq: 1, onEventsDone: noop, sound }))
+    // board cards render (their scenes come from the generated defs, not the default set)
+    const boardIds = [1, 2, 3].flatMap((t) => view.board[t as 1 | 2 | 3]).filter(Boolean) as string[]
+    expect(boardIds.every((id) => id.startsWith('x'))).toBe(true)
+    expect((tv.match(/spl-card/g) ?? []).length).toBeGreaterThanOrEqual(boardIds.length + view.nobles.length)
+    for (const portrait of Object.values(view.noblePortraits)) expect(tv).toContain(portrait)
+    expect(phone(state, 0)).toContain('Gems')
+  })
+})

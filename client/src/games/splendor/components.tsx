@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { CARD_BY_ID, GEMS, NOBLE_BY_ID, type Gem, type GemCounts, type Tier, type Token } from '@games/splendor/data'
+import { GEMS, NOBLE_BY_ID, type Gem, type GemCounts, type Tier, type Token } from '@games/splendor/data'
 import { BACK_IMG, GEM_IMG, NOBLE_IMG, PARCHMENT_IMG, SCENE_IMG } from './assets'
+import { useCardDef, useNoblePortrait } from './defs'
 
 /**
  * Composed Splendor components. Every gem everywhere is the single image for that gem; cards,
@@ -80,7 +81,7 @@ function CostPip({ gem, n }: { gem: Gem; n: number }) {
 
 /** A face-up development card. */
 export function Card({ id, size, dim, style }: { id: string; size: number; dim?: boolean; style?: CSSProperties }) {
-  const card = CARD_BY_ID[id]
+  const card = useCardDef(id)
   if (!card) return null
   return (
     <div
@@ -185,6 +186,8 @@ export function CardBack({ tier, size, style, children }: { tier: Tier; size: nu
 /** A noble tile: portrait, pale left strip with "3" and requirement chips. */
 export function NobleTile({ id, size, style }: { id: string; size: number; style?: CSSProperties }) {
   const noble = NOBLE_BY_ID[id]
+  // The portrait paired with this noble for this game (from a pool of 42).
+  const portrait = useNoblePortrait(id) ?? noble?.portrait
   if (!noble) return null
   return (
     <div
@@ -196,7 +199,7 @@ export function NobleTile({ id, size, style }: { id: string; size: number; style
         fontSize: size / 10,
         borderRadius: '0.6em',
         overflow: 'hidden',
-        backgroundImage: `url(${NOBLE_IMG[noble.portrait]})`,
+        backgroundImage: `url(${NOBLE_IMG[portrait ?? noble.portrait] ?? NOBLE_IMG[noble.portrait]})`,
         backgroundSize: 'cover',
         backgroundPosition: '65% 20%',
         ...style,

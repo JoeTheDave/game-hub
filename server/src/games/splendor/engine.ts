@@ -6,12 +6,18 @@ import {
   GEMS,
   NOBLES,
   NOBLE_BY_ID,
+  NOBLE_PORTRAITS,
   TIERS,
   TOKENS,
+  type CardDef,
   type Gem,
   type Tier,
   type Token,
 } from './data.js'
+import { generateDeck } from './generate.js'
+
+/** Card definitions in play: a randomized deck's, else the default set's. */
+export type CardDefs = Readonly<Record<string, CardDef>>
 
 /**
  * Splendor rules engine. Pure and immutable: every function returns new data and never mutates
@@ -80,6 +86,14 @@ export interface SplendorState {
   result: SplendorResult | null
   /** Completed turns, for stats. */
   turnCount: number
+  /** Only for "Randomize card content" games: the generated deck. Absent = the default set. */
+  cardDefs?: Record<string, CardDef>
+  /** Portrait key per noble in play (random from the 42-portrait pool, distinct per game). */
+  noblePortraits?: Record<string, string>
+}
+
+export interface SplendorOptions {
+  randomizeCards?: boolean
 }
 
 export type SplendorAction =
@@ -126,6 +140,14 @@ export interface SplendorTableView {
   lastAction: (LastAction & { summary: string }) | null
   result: SplendorResult | null
   finished: boolean
+  /**
+   * Definitions of every card this viewer can see (board and everyone's purchased cards; the
+   * player view adds its own reserved cards). Randomized games depend on this, since their cards
+   * aren't in the client's static data. Deck and hidden reserved cards are never included.
+   */
+  cardDefs: Record<string, CardDef>
+  /** Portrait key for every noble in play (on the table or won). */
+  noblePortraits: Record<string, string>
 }
 
 export interface Payment {
@@ -166,6 +188,16 @@ function orderOf(s: Pick<SplendorState, 'turnOrder' | 'firstPlayer' | 'players'>
   return Array.from({ length: n }, (_, i) => (s.firstPlayer + i) % n)
 }
 
+/** The card definitions a state plays with. */
+export function defsOf(s: Pick<SplendorState, 'cardDefs'>): CardDefs {
+  return s.cardDefs ?? CARD_BY_ID
+}
+
+/** The portrait for a noble: its paired one, else its own default (states from before pairing). */
+export function portraitOf(s: Pick<SplendorState, 'noblePortraits'>, nobleId: string): string {
+  return s.noblePortraits?.[nobleId] ?? NOBLE_BY_ID[nobleId]?.portrait ?? nobleId
+}
+
 function emptyTokens(): TokenCounts {
   return { white: 0, blue: 0, green: 0, red: 0, black: 0, gold: 0 }
 }
@@ -194,6 +226,9 @@ function cloneState(s: SplendorState): SplendorState {
     lastAction: s.lastAction ? { ...s.lastAction, gems: s.lastAction.gems ? { ...s.lastAction.gems } : undefined } : null,
     result: s.result ? { ranking: s.result.ranking.slice(), winners: s.result.winners.slice() } : null,
     turnCount: s.turnCount,
+    // Never mutated after setup, so they can be shared between states.
+    ...(s.cardDefs ? { cardDefs: s.cardDefs } : {}),
+    ...(s.noblePortraits ? { noblePortraits: s.noblePortraits } : {}),
   }
 }
 
@@ -201,22 +236,28 @@ export function tokenTotal(t: TokenCounts): number {
   return t.white + t.blue + t.green + t.red + t.black + t.gold
 }
 
-export function bonuses(p: PlayerState): Record<Gem, number> {
+export function bonuses(p: PlayerState, defs: CardDefs = CARD_BY_ID): Record<Gem, number> {
   const b: Record<Gem, number> = { white: 0, blue: 0, green: 0, red: 0, black: 0 }
-  for (const id of p.cards) b[CARD_BY_ID[id].bonus]++
+  for (const id of p.cards) b[defs[id].bonus]++
   return b
 }
 
-export function points(p: PlayerState): number {
+export function points(p: PlayerState, defs: CardDefs = CARD_BY_ID): number {
   let pts = 0
-  for (const id of p.cards) pts += CARD_BY_ID[id].points
+  for (const id of p.cards) pts += defs[id].points
   for (const id of p.nobles) pts += NOBLE_BY_ID[id].points
   return pts
 }
 
 /** Automatic payment: per color pay max(0, cost - bonus) with that color first, gold covers the rest. */
-export function computePayment(p: PlayerState, cardId: string, b: Record<Gem, number> = bonuses(p)): Payment {
-  const card = CARD_BY_ID[cardId]
+export function computePayment(
+  p: PlayerState,
+  cardId: string,
+  b?: Record<Gem, number>,
+  defs: CardDefs = CARD_BY_ID
+): Payment {
+  const card = defs[cardId]
+  b ??= bonuses(p, defs)
   const tokens: TokenDelta = {}
   let gold = 0
   for (const g of GEMS) {
@@ -231,8 +272,8 @@ export function computePayment(p: PlayerState, cardId: string, b: Record<Gem, nu
   return { tokens, goldShort: gold - goldUsed }
 }
 
-function meetsNoble(p: PlayerState, nobleId: string): boolean {
-  const b = bonuses(p)
+function meetsNoble(p: PlayerState, nobleId: string, defs: CardDefs): boolean {
+  const b = bonuses(p, defs)
   const req = NOBLE_BY_ID[nobleId].requires
   return GEMS.every((g) => b[g] >= (req[g] ?? 0))
 }
@@ -297,7 +338,8 @@ function discardCombos(held: TokenCounts, over: number): TokenDelta[] {
 
 function ranking(s: SplendorState): SplendorResult {
   const seats = s.players.map((_, i) => i)
-  const score = (i: number) => points(s.players[i])
+  const defs = defsOf(s)
+  const score = (i: number) => points(s.players[i], defs)
   const cards = (i: number) => s.players[i].cards.length
   seats.sort((a, b) => score(b) - score(a) || cards(a) - cards(b) || a - b)
   const best = seats[0]
@@ -315,7 +357,7 @@ function continueTurn(s: SplendorState, seat: number, events: GameEvent[]): void
     s.pending = { kind: 'discard', over: total - MAX_TOKENS }
     return
   }
-  const eligible = s.nobles.filter((n) => meetsNoble(p, n))
+  const eligible = s.nobles.filter((n) => meetsNoble(p, n, defsOf(s)))
   if (eligible.length > 1) {
     s.pending = { kind: 'noble', options: eligible }
     return
@@ -334,7 +376,7 @@ function awardNoble(s: SplendorState, seat: number, nobleId: string, events: Gam
 function endTurn(s: SplendorState, seat: number, events: GameEvent[]): void {
   s.pending = null
   s.turnCount++
-  if (!s.endTriggered && points(s.players[seat]) >= WIN_POINTS) {
+  if (!s.endTriggered && points(s.players[seat], defsOf(s)) >= WIN_POINTS) {
     s.endTriggered = true
     events.push({ type: 'endTriggered', seat })
   }
@@ -353,7 +395,8 @@ function endTurn(s: SplendorState, seat: number, events: GameEvent[]): void {
 
 function mainActions(s: SplendorState, seat: number): SplendorAction[] {
   const p = s.players[seat]
-  const b = bonuses(p)
+  const defs = defsOf(s)
+  const b = bonuses(p, defs)
   const out: SplendorAction[] = []
   const avail = availableGemColors(s.bank)
   const k = Math.min(3, avail.length)
@@ -369,11 +412,11 @@ function mainActions(s: SplendorState, seat: number): SplendorAction[] {
   }
   for (const tier of TIERS) {
     s.board[tier].forEach((id, slot) => {
-      if (id && computePayment(p, id, b).goldShort === 0) out.push({ type: 'buy', source: 'board', tier, slot })
+      if (id && computePayment(p, id, b, defs).goldShort === 0) out.push({ type: 'buy', source: 'board', tier, slot })
     })
   }
   for (const r of p.reserved) {
-    if (computePayment(p, r.id, b).goldShort === 0) out.push({ type: 'buy', source: 'reserved', cardId: r.id })
+    if (computePayment(p, r.id, b, defs).goldShort === 0) out.push({ type: 'buy', source: 'reserved', cardId: r.id })
   }
   return out
 }
@@ -390,14 +433,23 @@ export function legalActions(s: SplendorState, seat: number): SplendorAction[] {
 
 // ——— Setup ———
 
-export function setup(players: SeatInfo[], rng: Rng): { state: SplendorState; events: GameEvent[] } {
+export function setup(
+  players: SeatInfo[],
+  rng: Rng,
+  options?: SplendorOptions | unknown
+): { state: SplendorState; events: GameEvent[] } {
   const n = players.length
   if (n < 2 || n > 4) throw new Error('Splendor needs 2–4 players')
   const perGem = n === 2 ? 4 : n === 3 ? 5 : 7
+  // A randomized deck is drawn first and only when asked for, so default games consume the rng
+  // exactly as before (same seed, same game).
+  const randomize = !!(options && typeof options === 'object' && (options as SplendorOptions).randomizeCards === true)
+  const generated = randomize ? generateDeck(rng) : null
+  const cards: readonly CardDef[] = generated ?? CARDS
   const decks = {
-    1: shuffle(CARDS.filter((c) => c.tier === 1).map((c) => c.id), rng),
-    2: shuffle(CARDS.filter((c) => c.tier === 2).map((c) => c.id), rng),
-    3: shuffle(CARDS.filter((c) => c.tier === 3).map((c) => c.id), rng),
+    1: shuffle(cards.filter((c) => c.tier === 1).map((c) => c.id), rng),
+    2: shuffle(cards.filter((c) => c.tier === 2).map((c) => c.id), rng),
+    3: shuffle(cards.filter((c) => c.tier === 3).map((c) => c.id), rng),
   } as Record<Tier, string[]>
   const board = {
     1: decks[1].splice(0, BOARD_SLOTS),
@@ -407,6 +459,9 @@ export function setup(players: SeatInfo[], rng: Rng): { state: SplendorState; ev
   const nobles = shuffle(NOBLES.map((x) => x.id), rng).slice(0, n + 1)
   const turnOrder = shuffle(Array.from({ length: n }, (_, i) => i), rng)
   const firstPlayer = turnOrder[0]
+  // Each noble in play gets a distinct random portrait from the pool (drawn last, see above).
+  const portraits = shuffle(NOBLE_PORTRAITS, rng)
+  const noblePortraits = Object.fromEntries(nobles.map((id, i) => [id, portraits[i]]))
   const state: SplendorState = {
     decks,
     board,
@@ -421,6 +476,8 @@ export function setup(players: SeatInfo[], rng: Rng): { state: SplendorState; ev
     lastAction: null,
     result: null,
     turnCount: 0,
+    noblePortraits,
+    ...(generated ? { cardDefs: Object.fromEntries(generated.map((c) => [c.id, c])) } : {}),
   }
   return { state, events: [{ type: 'gameStarted', firstPlayer }] }
 }
@@ -548,11 +605,11 @@ export function applyAction(
         const r = p.reserved.find((x) => x.id === action.cardId)
         if (!r) return fail("That card isn't in your reserve")
         cardId = r.id
-        tier = CARD_BY_ID[cardId].tier
+        tier = defsOf(s)[cardId].tier
       } else {
         return fail('Invalid card source')
       }
-      const pay = computePayment(p, cardId)
+      const pay = computePayment(p, cardId, undefined, defsOf(s))
       if (pay.goldShort > 0) return fail("You can't afford that card")
       for (const [t, n] of Object.entries(pay.tokens)) {
         p.tokens[t as Token] -= n as number
@@ -610,7 +667,7 @@ function describeTokens(t: TokenDelta | undefined): string {
     .join(', ')
 }
 
-export function summarize(a: LastAction, players: SeatInfo[]): string {
+export function summarize(a: LastAction, players: SeatInfo[], defs: CardDefs = CARD_BY_ID): string {
   const who = seatName(players, a.seat)
   let text: string
   switch (a.type) {
@@ -622,7 +679,7 @@ export function summarize(a: LastAction, players: SeatInfo[]): string {
       text = `${who} reserved a tier ${a.tier} card${a.fromDeck ? ' from the deck' : ''}${a.goldGained ? ' and took a gold' : ''}`
       break
     case 'buy': {
-      const c = a.cardId ? CARD_BY_ID[a.cardId] : null
+      const c = a.cardId ? defs[a.cardId] : null
       text = c ? `${who} bought a ${GEM_NAMES[c.bonus]} card${c.points ? ` (+${c.points})` : ''}` : `${who} bought a card`
       break
     }
@@ -639,7 +696,17 @@ export function summarize(a: LastAction, players: SeatInfo[]): string {
   return text
 }
 
+/** Definitions for the given ids (skipping nulls). */
+function defsFor(defs: CardDefs, ids: (string | null)[]): Record<string, CardDef> {
+  const out: Record<string, CardDef> = {}
+  for (const id of ids) if (id && defs[id]) out[id] = defs[id]
+  return out
+}
+
 export function tableView(s: SplendorState, players: SeatInfo[]): SplendorTableView {
+  const defs = defsOf(s)
+  const visible = [...TIERS.flatMap((t) => s.board[t]), ...s.players.flatMap((p) => p.cards)]
+  const allNobles = [...s.nobles, ...s.players.flatMap((p) => p.nobles)]
   return {
     decks: { 1: s.decks[1].length, 2: s.decks[2].length, 3: s.decks[3].length },
     board: { 1: s.board[1].slice(), 2: s.board[2].slice(), 3: s.board[3].slice() },
@@ -653,12 +720,12 @@ export function tableView(s: SplendorState, players: SeatInfo[]): SplendorTableV
         color: info?.color ?? null,
         tokens: { ...p.tokens },
         tokenCount: tokenTotal(p.tokens),
-        bonuses: bonuses(p),
-        points: points(p),
+        bonuses: bonuses(p, defs),
+        points: points(p, defs),
         cards: p.cards.slice(),
         cardCount: p.cards.length,
         nobles: p.nobles.slice(),
-        reserved: p.reserved.map((r) => ({ tier: CARD_BY_ID[r.id].tier })),
+        reserved: p.reserved.map((r) => ({ tier: defs[r.id].tier })),
       }
     }),
     turn: s.turn,
@@ -666,9 +733,11 @@ export function tableView(s: SplendorState, players: SeatInfo[]): SplendorTableV
     firstPlayer: s.firstPlayer,
     pending: s.pending ? { kind: s.pending.kind, seat: s.turn } : null,
     endTriggered: s.endTriggered,
-    lastAction: s.lastAction ? { ...s.lastAction, summary: summarize(s.lastAction, players) } : null,
+    lastAction: s.lastAction ? { ...s.lastAction, summary: summarize(s.lastAction, players, defs) } : null,
     result: s.result ? { ranking: s.result.ranking.slice(), winners: s.result.winners.slice() } : null,
     finished: !!s.result,
+    cardDefs: defsFor(defs, visible),
+    noblePortraits: Object.fromEntries(allNobles.map((id) => [id, portraitOf(s, id)])),
   }
 }
 
@@ -679,12 +748,13 @@ export function playerView(s: SplendorState, seat: number, players: SeatInfo[]):
   const legal = isMyTurn ? legalActions(s, seat) : []
   const affordable: Record<string, boolean> = {}
   const payments: Record<string, Payment> = {}
+  const defs = defsOf(s)
   if (p) {
-    const b = bonuses(p)
+    const b = bonuses(p, defs)
     const ids = [...TIERS.flatMap((t) => s.board[t]), ...p.reserved.map((r) => r.id)]
     for (const id of ids) {
       if (!id) continue
-      const pay = computePayment(p, id, b)
+      const pay = computePayment(p, id, b, defs)
       payments[id] = pay
       affordable[id] = pay.goldShort === 0
     }
@@ -692,9 +762,11 @@ export function playerView(s: SplendorState, seat: number, players: SeatInfo[]):
   const has = (t: SplendorAction['type']) => legal.some((a) => a.type === t)
   return {
     ...base,
+    // Plus this seat's own reserved cards (hidden from everyone else).
+    cardDefs: p ? { ...base.cardDefs, ...defsFor(defs, p.reserved.map((r) => r.id)) } : base.cardDefs,
     me: seat,
     isMyTurn,
-    myReserved: p ? p.reserved.map((r) => ({ id: r.id, tier: CARD_BY_ID[r.id].tier, fromDeck: r.fromDeck })) : [],
+    myReserved: p ? p.reserved.map((r) => ({ id: r.id, tier: defs[r.id].tier, fromDeck: r.fromDeck })) : [],
     myPending: isMyTurn ? s.pending : null,
     legal: { take3: has('take3'), take2: has('take2'), reserve: has('reserve'), buy: has('buy'), pass: has('pass') },
     affordable,
@@ -708,7 +780,8 @@ export const splendorModule: GameModule<SplendorState, SplendorAction> = {
   name: 'Splendor',
   minPlayers: 2,
   maxPlayers: 4,
-  setup: (players, rng) => setup(players, rng),
+  options: [{ key: 'randomizeCards', label: 'Randomize card content', type: 'boolean', default: false }],
+  setup: (players, rng, options) => setup(players, rng, options),
   applyAction,
   tableView,
   playerView,
@@ -716,5 +789,5 @@ export const splendorModule: GameModule<SplendorState, SplendorAction> = {
   activeSeats: (s) => (s.result ? [] : [s.turn]),
   legalActions,
   winners: (s) => (s.result ? s.result.winners.slice() : []),
-  summary: (s) => (s.result ? { scores: s.players.map((p) => points(p)), winners: s.result.winners.slice() } : null),
+  summary: (s) => (s.result ? { scores: s.players.map((p) => points(p, defsOf(s))), winners: s.result.winners.slice() } : null),
 }

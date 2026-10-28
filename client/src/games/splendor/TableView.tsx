@@ -3,6 +3,7 @@ import type { TableViewProps } from '../types'
 import type { PublicPlayer, SplendorTableView } from '@games/splendor/engine'
 import { GEMS, TOKENS, type Tier, type Token as TokenKind } from '@games/splendor/data'
 import { CARD_BY_ID } from '@games/splendor/data'
+import { DefsProvider, cardDefFrom, useAccumulatedDefs, useDefs } from './defs'
 import { CARD_RATIO, Card, CardBack, NobleTile, TABLEAU_PEEK, TOKEN_COUNT_SCALE, Token, TokenPile, jitter, seatHex } from './components'
 import { FlipCard, FlyerView, type Flyer, type Rect } from './flyers'
 import { TABLE_IMG } from './assets'
@@ -201,8 +202,10 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
   const hideCss = hidden.map((a) => `[data-anchor="${a}"]{visibility:hidden}`).join('')
   const zones = zonesFor(view.players.length)
   const nobleSlots = useStableSlots(view.nobles)
+  const defs = useAccumulatedDefs(view)
 
   return (
+    <DefsProvider value={defs}>
     <div className="absolute inset-0 overflow-hidden" style={{ background: '#1a120b' }}>
       <div
         ref={stageRef}
@@ -289,6 +292,7 @@ export function TableView({ view, events, seq, onEventsDone, sound }: TableViewP
         {view.finished && view.result && flyers.length === 0 && <Standings view={view} />}
       </div>
     </div>
+    </DefsProvider>
   )
 }
 
@@ -408,7 +412,8 @@ function Loose({
 function PlayerSpot({ p, zone, first, pending }: { p: PublicPlayer; zone: Zone; first: boolean; pending: 'discard' | 'noble' | null }) {
   const { pr, slotsW, left, top, placeH, tokY, tableauY, slotX } = spotLayout(zone)
   const miniH = pr.mini * CARD_RATIO
-  const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => CARD_BY_ID[id]?.bonus === g) }))
+  const defs = useDefs()
+  const columns = GEMS.map((g) => ({ gem: g, cards: p.cards.filter((id) => cardDefFrom(defs, id)?.bonus === g) }))
   const tallest = Math.max(1, ...columns.map((c) => c.cards.length))
   const peek = Math.min(miniH * TABLEAU_PEEK, tallest > 1 ? (pr.tableauCap - miniH) / (tallest - 1) : miniH)
   const tableauH = Math.min(pr.tableauCap, miniH + (tallest - 1) * peek)
@@ -627,17 +632,14 @@ function Standings({ view }: { view: SplendorTableView }) {
         <div className="spl-title" style={{ fontSize: 56, textAlign: 'center', marginBottom: 18 }}>
           Splendor
         </div>
-        {r.ranking.map((seat, i) => {
+        {r.ranking.map((seat) => {
           const p = view.players.find((x) => x.seat === seat)!
           const won = r.winners.includes(seat)
           return (
             <div key={seat} className="spl-serif" style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 34, padding: '6px 0' }}>
-              <span style={{ width: 40 }}>{i + 1}.</span>
+              <span data-crown-col style={{ width: 40, textAlign: 'center' }}>{won ? '👑' : ''}</span>
               <span style={{ width: 16, height: 16, borderRadius: '50%', background: seatHex(p.color) }} />
-              <span style={{ flex: 1 }}>
-                {won ? '👑 ' : ''}
-                {p.name}
-              </span>
+              <span style={{ flex: 1 }}>{p.name}</span>
               <span>{p.points} pts</span>
               <span style={{ fontSize: 22, opacity: 0.7, width: 110, textAlign: 'right' }}>{p.cardCount} cards</span>
             </div>
@@ -725,7 +727,7 @@ export function planAnimation(
             from: a,
             to: b,
             node: fromReserve ? (
-              <FlipCard w={b.w} h={b.h} first={<CardBack tier={CARD_BY_ID[cardId].tier} size={b.w} />} second={<Card id={cardId} size={b.w} />} />
+              <FlipCard w={b.w} h={b.h} first={<CardBack tier={(prev.cardDefs?.[cardId] ?? next.cardDefs?.[cardId] ?? CARD_BY_ID[cardId]).tier} size={b.w} />} second={<Card id={cardId} size={b.w} />} />
             ) : (
               <Card id={cardId} size={b.w} />
             ),

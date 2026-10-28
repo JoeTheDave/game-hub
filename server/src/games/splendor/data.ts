@@ -138,3 +138,12 @@ export const NOBLES: readonly NobleDef[] = [
 
 export const CARD_BY_ID: Readonly<Record<string, CardDef>> = Object.fromEntries(CARDS.map((c) => [c.id, c]))
 export const NOBLE_BY_ID: Readonly<Record<string, NobleDef>> = Object.fromEntries(NOBLES.map((n) => [n.id, n]))
+
+/**
+ * Portrait pool: the original 10 plus Joe's 32 (p-01..p-32). Each game pairs every noble in play
+ * with a random, distinct portrait from this pool.
+ */
+export const NOBLE_PORTRAITS: readonly string[] = [
+  ...NOBLES.map((n) => n.portrait),
+  ...Array.from({ length: 32 }, (_, i) => `p-${String(i + 1).padStart(2, '0')}`),
+]

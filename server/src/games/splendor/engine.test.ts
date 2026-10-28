@@ -7,6 +7,7 @@ import {
   playerView,
   points,
   setup,
+  splendorModule,
   tableView,
   type SplendorAction,
   type SplendorState,
@@ -453,5 +454,76 @@ describe('turn order (shuffled every game)', () => {
     const legacy = { ...state, firstPlayer: 1, turn: 1 } as SplendorState
     delete (legacy as Partial<SplendorState>).turnOrder
     expect(tableView(legacy, seats(3)).turnOrder).toEqual([1, 2, 0])
+  })
+})
+
+describe('noble portraits and randomized cards (play-test round 2)', () => {
+  const four = [0, 1, 2, 3].map((i) => ({ playerOrder: i, screenName: `P${i + 1}`, color: null }))
+
+  it('pairs every noble in play with a distinct portrait from the 42-portrait pool, deterministically', async () => {
+    const { NOBLE_PORTRAITS } = await import('./data.js')
+    expect(NOBLE_PORTRAITS).toHaveLength(42)
+    const seen = new Set<string>()
+    for (let seed = 1; seed <= 60; seed++) {
+      const { state } = splendorModule.setup(four, seededRng(seed))
+      const pairs = state.noblePortraits!
+      expect(Object.keys(pairs).sort()).toEqual(state.nobles.slice().sort())
+      const ps = Object.values(pairs)
+      expect(new Set(ps).size).toBe(ps.length)
+      for (const p of ps) {
+        expect(NOBLE_PORTRAITS).toContain(p)
+        seen.add(p)
+      }
+      expect(splendorModule.setup(four, seededRng(seed)).state.noblePortraits).toEqual(pairs)
+    }
+    // the new portraits actually get used
+    expect([...seen].some((p) => p.startsWith('p-'))).toBe(true)
+    const view = tableView(splendorModule.setup(four, seededRng(3)).state, four)
+    expect(Object.keys(view.noblePortraits).sort()).toEqual(view.nobles.slice().sort())
+  })
+
+  it('falls back to each noble’s default portrait for states saved before pairing', async () => {
+    const { portraitOf } = await import('./engine.js')
+    expect(portraitOf({}, 'n-04')).toBe('n-04')
+    expect(portraitOf({ noblePortraits: { 'n-04': 'p-17' } }, 'n-04')).toBe('p-17')
+  })
+
+  it('declares the option and keeps default games unchanged when it is off', () => {
+    expect(splendorModule.options).toEqual([{ key: 'randomizeCards', label: 'Randomize card content', type: 'boolean', default: false }])
+    const off = splendorModule.setup(four, seededRng(9), { randomizeCards: false }).state
+    const none = splendorModule.setup(four, seededRng(9)).state
+    expect(off).toEqual(none)
+    expect(off.cardDefs).toBeUndefined()
+    expect(off.board[1].every((id) => id && /^t1-/.test(id))).toBe(true)
+  })
+
+  it('plays a randomized deck: generated defs drive payment, and views expose only visible defs', async () => {
+    const { computePayment, defsOf } = await import('./engine.js')
+    const { state } = splendorModule.setup(four.slice(0, 2), seededRng(11), { randomizeCards: true })
+    expect(Object.keys(state.cardDefs!)).toHaveLength(90)
+    const all = [...state.decks[1], ...state.decks[2], ...state.decks[3], ...[1, 2, 3].flatMap((t) => state.board[t as 1 | 2 | 3] as string[])]
+    expect(all.every((id) => state.cardDefs![id])).toBe(true)
+    // payment uses the generated cost
+    const id = state.board[1][0]!
+    const pay = computePayment(state.players[0], id, undefined, defsOf(state))
+    const totalCost = Object.values(state.cardDefs![id].cost).reduce((a, b) => a + (b ?? 0), 0)
+    expect(pay.goldShort).toBe(totalCost)
+
+    // reserve from the deck for seat 0: visible to seat 0's view only
+    let s = state
+    const r = splendorModule.applyAction(s, s.turn, { type: 'reserve', tier: 1, fromDeck: true }, seededRng(1))
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    s = r.state
+    const owner = state.turn
+    const other = 1 - owner
+    const reservedId = s.players[owner].reserved[0].id
+    const tv = tableView(s, four.slice(0, 2))
+    expect(tv.cardDefs[reservedId]).toBeUndefined()
+    expect(playerView(s, other, four.slice(0, 2)).cardDefs[reservedId]).toBeUndefined()
+    expect(playerView(s, owner, four.slice(0, 2)).cardDefs[reservedId]).toEqual(s.cardDefs![reservedId])
+    // board cards are all described; deck cards never are
+    for (const t of [1, 2, 3] as const) for (const b of s.board[t]) if (b) expect(tv.cardDefs[b]).toEqual(s.cardDefs![b])
+    for (const t of [1, 2, 3] as const) for (const d of s.decks[t]) expect(tv.cardDefs[d]).toBeUndefined()
   })
 })

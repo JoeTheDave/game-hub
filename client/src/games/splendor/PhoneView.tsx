@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { AdminMenu } from '../../components/AdminMenu'
 import type { PhoneViewProps } from '../types'
 import type { SplendorAction, SplendorPlayerView } from '@games/splendor/engine'
+import { DefsProvider, useAccumulatedDefs } from './defs'
 import { CARD_BY_ID, TOKENS, type Gem, type Tier, type Token as TokenKind } from '@games/splendor/data'
 import { CARD_RATIO, Card, CardBack, CountBadge, GEM_COLOR, GEM_NAME, GemImg, NobleTile, Token, seatHex } from './components'
 import {
@@ -76,8 +77,10 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
   else status = `Waiting for ${turnName}…`
 
   const takeover = view.finished ? 'finished' : view.myPending?.kind ?? null
+  const defs = useAccumulatedDefs(view)
 
   return (
+    <DefsProvider value={defs}>
     <div
       className="flex-1 min-h-0 flex flex-col relative text-amber-50"
       style={{
@@ -174,6 +177,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
 
       {sheet && <CardSheet sheet={sheet} view={view} canAct={isMyTurn} pending={pending} onAct={act} onClose={() => setSheet(null)} />}
     </div>
+    </DefsProvider>
   )
 }
 
@@ -289,15 +293,11 @@ function CardsTab({ view, highlight, onCard }: { view: SplendorPlayerView; highl
   )
 }
 
-function AffordableMark() {
-  return (
-    <>
-      <span className="absolute inset-0 rounded-[7%] pointer-events-none" style={{ boxShadow: '0 0 0 2px #86efac, 0 0 12px 2px rgba(134,239,172,.6)' }} />
-      <span className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-emerald-400 text-stone-900 text-[10px] font-black flex items-center justify-center">
-        ✓
-      </span>
-    </>
-  )
+/** Affordable cards glow blue (play-test: blue, no checkmark). */
+export const AFFORDABLE_GLOW = '0 0 0 2px #60a5fa, 0 0 12px 2px rgba(96,165,250,.65)'
+
+export function AffordableMark() {
+  return <span data-affordable className="absolute inset-0 rounded-[7%] pointer-events-none" style={{ boxShadow: AFFORDABLE_GLOW }} />
 }
 
 // ——— Reserved hand (private) ———
@@ -360,7 +360,7 @@ function CardSheet({
         {sheet.kind === 'deck' ? (
           <p className="text-sm text-amber-100/80 text-center">Reserve the top card of tier {sheet.tier} without showing anyone{goldLeft ? ', and take a gold.' : '. (No gold left.)'}</p>
         ) : pay ? (
-          <PaymentLine pay={pay} bonusGem={CARD_BY_ID[sheet.id].bonus} />
+          <PaymentLine pay={pay} bonusGem={(view.cardDefs?.[sheet.id] ?? CARD_BY_ID[sheet.id]).bonus} />
         ) : null}
         {canAct ? (
           <div className="w-full flex gap-2">
@@ -483,7 +483,7 @@ function Finished({ view, me, rematch }: { view: SplendorPlayerView; me: number;
       <div className="spl-title text-4xl">Splendor</div>
       <p className="text-lg">{r.winners.includes(me) ? '👑 You win!' : 'Game over'}</p>
       <div className="w-full max-w-sm flex flex-col gap-2">
-        {r.ranking.map((seat, i) => {
+        {r.ranking.map((seat) => {
           const p = view.players.find((x) => x.seat === seat)!
           return (
             <div
@@ -491,12 +491,9 @@ function Finished({ view, me, rematch }: { view: SplendorPlayerView; me: number;
               className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
               style={{ background: seat === me ? 'rgba(253,230,138,.18)' : 'rgba(255,255,255,.06)', outline: seat === me ? '2px solid #fde68a' : 'none' }}
             >
-              <span className="w-5 font-bold">{i + 1}</span>
+              <span data-crown-col className="w-6 text-center">{r.winners.includes(seat) ? '👑' : ''}</span>
               <span className="w-3 h-3 rounded-full" style={{ background: seatHex(p.color) }} />
-              <span className="flex-1 truncate">
-                {r.winners.includes(seat) ? '👑 ' : ''}
-                {p.name}
-              </span>
+              <span className="flex-1 truncate">{p.name}</span>
               <span className="font-bold">{p.points}</span>
               <span className="text-xs opacity-60">{p.cardCount} cards</span>
             </div>

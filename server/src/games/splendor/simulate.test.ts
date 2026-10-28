@@ -111,3 +111,49 @@ describe('headless simulation', () => {
     expect(JSON.parse(JSON.stringify(r.finalState))).toEqual(r.finalState)
   })
 })
+
+describe('headless simulation with randomized decks', () => {
+  it('plays 1,000 randomized games across 2/3/4 players with the invariants holding, and replays deterministically', () => {
+    let finished = 0
+    for (let i = 0; i < 1000; i++) {
+      const n = 2 + (i % 3)
+      const res = simulate(game, { players: n, seed: 5000 + i, options: { randomizeCards: true } })
+      const s = res.finalState
+      expect(Object.keys(s.cardDefs ?? {})).toHaveLength(90)
+      // every card is in exactly one place, and every card is a generated one
+      const all = [
+        ...s.decks[1], ...s.decks[2], ...s.decks[3],
+        ...[1, 2, 3].flatMap((t) => s.board[t as 1 | 2 | 3].filter((x): x is string => !!x)),
+        ...s.players.flatMap((p) => [...p.cards, ...p.reserved.map((r) => r.id)]),
+      ]
+      expect(new Set(all).size).toBe(90)
+      expect(all.every((id) => s.cardDefs![id])).toBe(true)
+      for (const p of s.players) expect(p.reserved.length).toBeLessThanOrEqual(3)
+      if (!res.stalled) finished++
+      if (i % 100 === 0) {
+        const again = replay(game, n, 5000 + i, res.log, { randomizeCards: true })
+        expect(again).toEqual(s)
+      }
+    }
+    expect(finished).toBeGreaterThanOrEqual(990)
+  }, 60_000)
+
+  it('checks the invariants after every action in randomized 4-player games', () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const rng = seededRng(seed)
+      const agentRng = seededRng(seed ^ 0x9e3779b9)
+      let { state } = game.setup(seats(4), rng, { randomizeCards: true })
+      for (let step = 0; step < 2000 && !game.isFinished(state); step++) {
+        const seat = game.activeSeats(state)[0]
+        const legal = game.legalActions(state, seat)
+        const res = game.applyAction(state, seat, legal[Math.floor(agentRng() * legal.length)], rng)
+        if (!res.ok) throw new Error(res.error)
+        state = res.state
+        for (const t of ['white', 'blue', 'green', 'red', 'black', 'gold'] as const) {
+          expect(state.bank[t] + state.players.reduce((a, p) => a + p.tokens[t], 0)).toBe(t === 'gold' ? 5 : 7)
+        }
+        for (const p of state.players) if (state.pending === null) expect(tokenTotal(p.tokens)).toBeLessThanOrEqual(10)
+      }
+    }
+  })
+})
