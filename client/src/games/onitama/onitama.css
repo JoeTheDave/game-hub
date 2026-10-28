@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@500;700;800&display=swap');
+
+/* Brush lettering for names, titles and the piece kanji (matches the poster's calligraphy). */
+.oni-brush {
+  font-family: 'Yuji Syuku', 'Shippori Mincho', serif;
+  font-weight: 400;
+}
+/* A clean Mincho serif for body text and numerals (lining figures). */
+.oni-serif {
+  font-family: 'Shippori Mincho', Georgia, serif;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.oni-title {
+  font-family: 'Yuji Syuku', serif;
+  color: #a3241c;
+  text-shadow: 0 0.03em 0 rgba(255, 255, 255, 0.4), 0 0.05em 0.12em rgba(0, 0, 0, 0.35);
+}
+.oni-flyer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  z-index: 30;
+  will-change: transform, opacity;
+}
+.oni-flip {
+  position: relative;
+  transform-style: preserve-3d;
+}
+.oni-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.oni-face-back {
+  transform: rotateY(180deg);
+}
+@keyframes oni-pop {
+  0% { transform: scale(0.9) rotate(-1deg); opacity: 0; }
+  100% { transform: scale(1) rotate(-1deg); opacity: 1; }
+}
+.oni-pop {
+  animation: oni-pop 380ms ease-out both;
+}
+@keyframes oni-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.85; }
+}
+.oni-pulse {
+  animation: oni-pulse 1.6s ease-in-out infinite;
+}
