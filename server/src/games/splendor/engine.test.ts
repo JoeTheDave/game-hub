@@ -460,9 +460,10 @@ describe('turn order (shuffled every game)', () => {
 describe('noble portraits and randomized cards (play-test round 2)', () => {
   const four = [0, 1, 2, 3].map((i) => ({ playerOrder: i, screenName: `P${i + 1}`, color: null }))
 
-  it('pairs every noble in play with a distinct portrait from the 42-portrait pool, deterministically', async () => {
+  it('pairs every noble in play with a distinct portrait from Joe’s 32-portrait pool, deterministically', async () => {
     const { NOBLE_PORTRAITS } = await import('./data.js')
-    expect(NOBLE_PORTRAITS).toHaveLength(42)
+    expect(NOBLE_PORTRAITS).toHaveLength(32)
+    expect(NOBLE_PORTRAITS.every((p) => p.startsWith('p-'))).toBe(true)
     const seen = new Set<string>()
     for (let seed = 1; seed <= 60; seed++) {
       const { state } = splendorModule.setup(four, seededRng(seed))
@@ -484,7 +485,9 @@ describe('noble portraits and randomized cards (play-test round 2)', () => {
 
   it('falls back to each noble’s default portrait for states saved before pairing', async () => {
     const { portraitOf } = await import('./engine.js')
-    expect(portraitOf({}, 'n-04')).toBe('n-04')
+    expect(portraitOf({}, 'n-04')).toBe('p-04')
+    // a pairing to a retired n-* portrait maps to a p-* one
+    expect(portraitOf({ noblePortraits: { 'n-04': 'n-09' } }, 'n-04')).toBe('p-09')
     expect(portraitOf({ noblePortraits: { 'n-04': 'p-17' } }, 'n-04')).toBe('p-17')
   })
 

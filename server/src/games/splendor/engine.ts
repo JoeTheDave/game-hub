@@ -193,9 +193,15 @@ export function defsOf(s: Pick<SplendorState, 'cardDefs'>): CardDefs {
   return s.cardDefs ?? CARD_BY_ID
 }
 
-/** The portrait for a noble: its paired one, else its own default (states from before pairing). */
+/**
+ * The portrait for a noble: its paired one, else its own default (states from before pairing).
+ * Pairings saved before the original n-* portraits were retired map to that noble's p-* default.
+ */
 export function portraitOf(s: Pick<SplendorState, 'noblePortraits'>, nobleId: string): string {
-  return s.noblePortraits?.[nobleId] ?? NOBLE_BY_ID[nobleId]?.portrait ?? nobleId
+  const paired = s.noblePortraits?.[nobleId]
+  if (paired && !paired.startsWith('n-')) return paired
+  if (paired) return NOBLE_BY_ID[paired]?.portrait ?? NOBLE_BY_ID[nobleId]?.portrait ?? 'p-01'
+  return NOBLE_BY_ID[nobleId]?.portrait ?? 'p-01'
 }
 
 function emptyTokens(): TokenCounts {

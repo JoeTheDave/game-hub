@@ -124,26 +124,23 @@ export const CARDS: readonly CardDef[] = [
 ]
 
 export const NOBLES: readonly NobleDef[] = [
-  { id: 'n-01', points: 3, requires: { green: 3, blue: 3, red: 3 }, portrait: 'n-01' },
-  { id: 'n-02', points: 3, requires: { black: 3, red: 3, white: 3 }, portrait: 'n-02' },
-  { id: 'n-03', points: 3, requires: { black: 3, red: 3, green: 3 }, portrait: 'n-03' },
-  { id: 'n-04', points: 3, requires: { black: 4, red: 4 }, portrait: 'n-04' },
-  { id: 'n-05', points: 3, requires: { green: 3, blue: 3, white: 3 }, portrait: 'n-05' },
-  { id: 'n-06', points: 3, requires: { black: 3, blue: 3, white: 3 }, portrait: 'n-06' },
-  { id: 'n-07', points: 3, requires: { black: 4, white: 4 }, portrait: 'n-07' },
-  { id: 'n-08', points: 3, requires: { blue: 4, green: 4 }, portrait: 'n-08' },
-  { id: 'n-09', points: 3, requires: { blue: 4, white: 4 }, portrait: 'n-09' },
-  { id: 'n-10', points: 3, requires: { red: 4, green: 4 }, portrait: 'n-10' },
+  { id: 'n-01', points: 3, requires: { green: 3, blue: 3, red: 3 }, portrait: 'p-01' },
+  { id: 'n-02', points: 3, requires: { black: 3, red: 3, white: 3 }, portrait: 'p-02' },
+  { id: 'n-03', points: 3, requires: { black: 3, red: 3, green: 3 }, portrait: 'p-03' },
+  { id: 'n-04', points: 3, requires: { black: 4, red: 4 }, portrait: 'p-04' },
+  { id: 'n-05', points: 3, requires: { green: 3, blue: 3, white: 3 }, portrait: 'p-05' },
+  { id: 'n-06', points: 3, requires: { black: 3, blue: 3, white: 3 }, portrait: 'p-06' },
+  { id: 'n-07', points: 3, requires: { black: 4, white: 4 }, portrait: 'p-07' },
+  { id: 'n-08', points: 3, requires: { blue: 4, green: 4 }, portrait: 'p-08' },
+  { id: 'n-09', points: 3, requires: { blue: 4, white: 4 }, portrait: 'p-09' },
+  { id: 'n-10', points: 3, requires: { red: 4, green: 4 }, portrait: 'p-10' },
 ]
 
 export const CARD_BY_ID: Readonly<Record<string, CardDef>> = Object.fromEntries(CARDS.map((c) => [c.id, c]))
 export const NOBLE_BY_ID: Readonly<Record<string, NobleDef>> = Object.fromEntries(NOBLES.map((n) => [n.id, n]))
 
 /**
- * Portrait pool: the original 10 plus Joe's 32 (p-01..p-32). Each game pairs every noble in play
- * with a random, distinct portrait from this pool.
+ * Portrait pool: Joe's 32 portraits (p-01..p-32). The original 10 generated portraits were retired
+ * (Joe, 2026-10-28). Each game pairs every noble in play with a random, distinct portrait from here.
  */
-export const NOBLE_PORTRAITS: readonly string[] = [
-  ...NOBLES.map((n) => n.portrait),
-  ...Array.from({ length: 32 }, (_, i) => `p-${String(i + 1).padStart(2, '0')}`),
-]
+export const NOBLE_PORTRAITS: readonly string[] = Array.from({ length: 32 }, (_, i) => `p-${String(i + 1).padStart(2, '0')}`)

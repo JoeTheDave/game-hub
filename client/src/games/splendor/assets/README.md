@@ -5,7 +5,7 @@ Every image here was **newly generated with local AI image generation**. The sca
 ## Library (each asset generated once, reused everywhere)
 - `gems/{white,blue,green,red,black,gold}.webp`: transparent, 512², the gem fitted to a 448 box. **The only gem art in the game.** Used on card corners, cost pips, tokens, noble chips, bonus counters and phone chips.
 - `scenes/t{1,2,3}-{white,blue,green,red,black}.webp`: card scene paintings, 630×880 (63:88). Several cards of the same tier and color share a scene.
-- `nobles/n-01..n-10.webp`: noble portraits, 512², in the same order as the nobles in the card-data note.
+- `nobles/p-01..p-32.webp`: noble portraits (Joe's 32, sliced by `slice_portraits.py`). The original generated `n-01..n-10` were retired on 2026-10-28 and are no longer produced into the app; `process_assets.py` still contains their old recipe for history.
 - `backs/engraving.webp`: grayscale quill engraving, 630×880. Tint it per tier in CSS (green / amber / blue).
 - `backs/noble-engraving.webp`: grayscale horseman engraving, 512². Tint it brown.
 - `token/parchment.webp`: the token-center texture, 256². The colored rim is CSS.

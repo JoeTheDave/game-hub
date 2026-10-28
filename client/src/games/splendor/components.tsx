@@ -186,7 +186,7 @@ export function CardBack({ tier, size, style, children }: { tier: Tier; size: nu
 /** A noble tile: portrait, pale left strip with "3" and requirement chips. */
 export function NobleTile({ id, size, style }: { id: string; size: number; style?: CSSProperties }) {
   const noble = NOBLE_BY_ID[id]
-  // The portrait paired with this noble for this game (from a pool of 42).
+  // The portrait paired with this noble for this game (from Joe's pool of 32).
   const portrait = useNoblePortrait(id) ?? noble?.portrait
   if (!noble) return null
   return (
