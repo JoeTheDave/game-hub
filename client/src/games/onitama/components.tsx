@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { CARD_BY_ID, type Color } from '@games/onitama/data'
-import { KANJI_IMG, PARCHMENT_IMG, STAMP_IMG, TEMPLE_IMG } from './assets'
+import { KANJI_IMG, TEMPLE_IMG } from './assets'
+import { BAND_COLOR, MOVE_COLOR, REPO, REPO_IMG, REPO_SVG, STAMP_COLOR, alignmentOf } from './cardStyle'
 import { diagramCell, type Facing, type SeriesSummary } from './logic'
 
 /** Team inks, matched to the poster: lacquer red and indigo blue. */
@@ -26,18 +27,25 @@ export function jitter(key: string, maxDeg: number, maxPx: number) {
 }
 
 /**
- * A move card: parchment, the card's kanji calligraphy, its name in a brush font, the 5×5 move
- * diagram (centre = the moving piece, move squares in the card's stamp tint) drawn for the screen
- * direction its holder faces, the first-player hanko stamp, and a line of its quote.
+ * A move card in the original repo's design (Joe's github.com/JoeTheDave/onitama), stood upright
+ * for the phone: card texture with a card-tan panel, the swish stroke and the card's animal art,
+ * its NAME (IM Fell English SC), the 5×5 attack-pattern grid (white squares, dark centre, moves
+ * in the card's alignment colour) drawn for the screen direction its holder faces, and the wisdom
+ * band (alignment tint) with the quote and the first-player box. A faint kanji sits in the corner.
+ * The TV paints the landscape version onto the 3D table (`cardArt.ts`).
  */
 export function Card({ id, w, facing = 'up', style, quote = true }: { id: string; w: number; facing?: Facing; style?: CSSProperties; quote?: boolean }) {
   const def = CARD_BY_ID[id]
   const h = w * 1.4
-  const grid = w * 0.6
+  const align = alignmentOf(id)
+  const pad = w * 0.035
+  const inner = w - pad * 2
+  const grid = w * 0.58
   const cell = grid / 5
-  const tint = def ? INK_SOFT[def.stamp] : 'rgba(0,0,0,.5)'
   const moves = new Set((def?.moves ?? []).map((m) => diagramCell(m, facing).join(',')))
   const showQuote = quote && w >= 150 && !!def
+  const bandH = h * (showQuote ? 0.2 : 0.11)
+  const iconW = w * 0.16
   return (
     <div
       className="oni-card"
@@ -47,91 +55,130 @@ export function Card({ id, w, facing = 'up', style, quote = true }: { id: string
         position: 'relative',
         width: w,
         height: h,
-        borderRadius: w * 0.06,
+        borderRadius: w * 0.05,
         overflow: 'hidden',
-        backgroundColor: '#efe3c6',
-        backgroundImage: `url(${PARCHMENT_IMG})`,
+        backgroundColor: '#d8d2b4',
+        backgroundImage: `url(${REPO_IMG.cardTexture})`,
         backgroundSize: 'cover',
-        boxShadow: `0 ${w * 0.02}px ${w * 0.06}px rgba(0,0,0,.5), inset 0 0 0 ${Math.max(1, w * 0.012)}px rgba(60,40,20,.45), inset 0 0 ${w * 0.08}px rgba(120,80,30,.25)`,
-        color: '#2a1d12',
+        boxShadow: `0 ${w * 0.02}px ${w * 0.06}px rgba(0,0,0,.5)`,
+        border: `1px solid ${REPO.darkGray}`,
+        boxSizing: 'border-box',
+        color: REPO.darkGray,
         ...style,
       }}
     >
-      {def && (
+      <div style={{ position: 'absolute', inset: pad, borderRadius: w * 0.045, background: REPO.cardTan }} />
+      {REPO_SVG.swish && (
+        <img
+          src={REPO_SVG.swish}
+          alt=""
+          draggable={false}
+          decoding="sync"
+          style={{ position: 'absolute', left: pad, top: pad, width: inner * 0.7, height: inner * 0.7, transform: 'rotate(-160deg)', pointerEvents: 'none' }}
+        />
+      )}
+      {def && KANJI_IMG[id] && (
         <img
           src={KANJI_IMG[id]}
           alt=""
           draggable={false}
           decoding="sync"
-          style={{ position: 'absolute', left: '50%', top: h * 0.035, height: h * 0.24, width: 'auto', transform: 'translateX(-50%)', opacity: 0.88 }}
+          style={{ position: 'absolute', left: pad * 2, top: pad * 1.6, height: h * 0.085, width: 'auto', opacity: 0.45 }}
         />
       )}
-      {def && (
+      {def && REPO_SVG[id] && (
         <img
-          src={STAMP_IMG[def.stamp]}
+          src={REPO_SVG[id]}
           alt=""
           draggable={false}
           decoding="sync"
-          title={`${def.stamp === 'red' ? 'Red' : 'Blue'} starts`}
-          style={{ position: 'absolute', right: w * 0.05, top: w * 0.05, width: w * 0.2, height: w * 0.2, opacity: 0.9 }}
+          style={{ position: 'absolute', left: pad, right: pad, top: h * 0.035, margin: '0 auto', height: h * 0.22, maxWidth: inner * 0.9, objectFit: 'contain' }}
         />
       )}
       <div
-        className="oni-brush"
-        style={{ position: 'absolute', left: 0, right: 0, top: h * 0.285, textAlign: 'center', fontSize: w * 0.125, lineHeight: 1.1 }}
+        className="oni-repo-name"
+        style={{ position: 'absolute', left: 0, right: 0, top: h * 0.27, textAlign: 'center', fontSize: Math.min(w * 0.12, (inner * 1.6) / Math.max(4, (def?.name ?? '').length)), lineHeight: 1.1 }}
       >
-        {def?.name ?? ''}
+        {(def?.name ?? '').toUpperCase()}
       </div>
       <svg
         data-diagram=""
         width={grid}
         height={grid}
         viewBox={`0 0 ${grid} ${grid}`}
-        style={{ position: 'absolute', left: (w - grid) / 2, top: h * 0.4 }}
+        style={{ position: 'absolute', left: (w - grid) / 2, top: h * 0.375, borderRadius: cell * 0.27, overflow: 'hidden' }}
       >
         {Array.from({ length: 25 }, (_, i) => {
           const col = i % 5
           const row = Math.floor(i / 5)
           const centre = col === 2 && row === 2
           const move = moves.has(`${col},${row}`)
+          const g = Math.max(0.6, cell * 0.035)
           return (
             <rect
               key={i}
               data-move={move ? '' : undefined}
-              x={col * cell + 1}
-              y={row * cell + 1}
-              width={cell - 2}
-              height={cell - 2}
-              rx={cell * 0.12}
-              fill={centre ? '#2a1d12' : move ? tint : 'rgba(255,255,255,.35)'}
-              stroke="rgba(60,40,20,.35)"
-              strokeWidth={0.8}
+              x={col * cell + g}
+              y={row * cell + g}
+              width={cell - g * 2}
+              height={cell - g * 2}
+              fill={centre ? REPO.darkGray : move ? MOVE_COLOR[align] : '#ffffff'}
             />
           )
         })}
       </svg>
-      {showQuote && (
+      <div
+        style={{
+          position: 'absolute',
+          left: pad * 2,
+          right: pad * 2,
+          bottom: pad * 2,
+          height: bandH,
+          borderRadius: w * 0.025,
+          background: BAND_COLOR[align],
+          display: 'flex',
+          alignItems: 'center',
+          gap: w * 0.03,
+          padding: `0 ${w * 0.03}px`,
+          boxSizing: 'border-box',
+        }}
+      >
         <div
-          className="oni-serif"
+          className="oni-repo-wisdom"
           style={{
-            position: 'absolute',
-            left: w * 0.08,
-            right: w * 0.08,
-            bottom: h * 0.035,
-            fontSize: w * 0.052,
+            flex: 1,
+            fontSize: w * 0.05,
             lineHeight: 1.2,
-            fontStyle: 'italic',
             textAlign: 'center',
-            opacity: 0.72,
+            color: '#444',
             display: '-webkit-box',
-            WebkitLineClamp: 2,
+            WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}
         >
-          {def!.text.replace(/\n/g, ' ')}
+          {showQuote ? def!.text.replace(/\n/g, ' ') : ''}
         </div>
-      )}
+        {def && (
+          <div
+            data-stamp={def.stamp}
+            title={`${def.stamp === 'red' ? 'Red' : 'Blue'} starts`}
+            style={{
+              width: iconW,
+              height: iconW * 0.75,
+              flexShrink: 0,
+              background: STAMP_COLOR[def.stamp],
+              border: `${Math.max(1, w * 0.01)}px solid ${REPO.opaqueWhite}`,
+              boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {REPO_SVG['master-icon'] && <img src={REPO_SVG['master-icon']} alt="" draggable={false} decoding="sync" style={{ width: '82%', height: '82%' }} />}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

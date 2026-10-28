@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@500;700;800&family=IM+Fell+English+SC&family=Caudex:ital,wght@0,400;0,700;1,400&display=swap');
 
 /* Brush lettering for names, titles and the piece kanji (matches the poster's calligraphy). */
 .oni-brush {
@@ -49,4 +49,14 @@
 }
 .oni-pulse {
   animation: oni-pulse 1.6s ease-in-out infinite;
+}
+
+/* The original repo's card lettering: names in IM Fell English SC, wisdom in Caudex. */
+.oni-repo-name {
+  font-family: 'IM Fell English SC', Georgia, serif;
+  font-weight: 700;
+  color: rgb(68, 68, 68);
+}
+.oni-repo-wisdom {
+  font-family: Caudex, Georgia, serif;
 }

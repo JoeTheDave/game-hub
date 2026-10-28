@@ -107,3 +107,27 @@ export function wayLine(way: 'stone' | 'stream' | 'draw' | undefined): string {
   if (way === 'stream') return 'Way of the Stream'
   return 'A draw — the masters part ways'
 }
+
+const FILES = 'ABCDE'
+
+/**
+ * A square's name as the player sees it on their phone: files A–E left → right, ranks 1–5 counted
+ * from the player's own home row (their home row is rank 1).
+ */
+export function squareLabel(sq: Square, me: Color): string {
+  const [col, row] = phoneCell(sq, me)
+  return `${FILES[col]}${5 - row}`
+}
+
+/** The confirm bar's wording for a chosen move, e.g. "Move Student to C3 with Tiger". */
+export function moveLabel(o: MoveOption, pieceIsMaster: boolean, cardName: string, me: Color): string {
+  if (o.action.type !== 'move') return `Pass ${cardName}`
+  const base = `Move ${pieceIsMaster ? 'Master' : 'Student'} to ${squareLabel(o.action.to, me)} with ${cardName}`
+  return o.wins ? `${base} — this wins!` : base
+}
+
+/** True when an option is the chosen destination (same card, from and to). */
+export function isSameMove(a: MoveOption | null, b: MoveOption | null): boolean {
+  if (!a || !b || a.action.type !== 'move' || b.action.type !== 'move') return false
+  return a.action.card === b.action.card && same(a.action.from, b.action.from) && same(a.action.to, b.action.to)
+}

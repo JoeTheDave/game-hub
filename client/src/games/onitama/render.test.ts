@@ -3,7 +3,9 @@ import { renderToString } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { onitamaModule, playerView, tableView, type OnitamaAction, type OnitamaState } from '@games/onitama/engine'
 import { seededRng, type SeatInfo } from '@games/types'
-import { TableView, planAnimation, MAX_TURN_MS } from './TableView'
+import { TableView, MAX_TURN_MS } from './TableView'
+import { planTimeline, cardPoses, piecePoses, sampleTrack, viewerColor } from './three/timeline'
+import { cameraYaw } from './three/geometry'
 import { PhoneView } from './PhoneView'
 import type { GameInstance } from '../../types/game'
 
@@ -55,15 +57,13 @@ const phone = (st: OnitamaState, seat: number, extra: Record<string, unknown> = 
   )
 
 describe('onitama renders', () => {
-  it('draws the TV table: 10 pieces as ink tokens (no images), 5 cards with diagrams, both temples', () => {
+  it('draws the TV as a 3D canvas with HTML name tents (pieces and cards live in the WebGL scene)', () => {
     const [start] = play(3)
     const html = tv(start)
-    expect((html.match(/data-anchor="piece-/g) ?? []).length).toBe(10)
-    expect((html.match(/data-card="/g) ?? []).length).toBe(5)
-    expect((html.match(/data-diagram=""/g) ?? []).length).toBe(5)
-    expect(html).toContain('師')
-    expect(html).toContain('弟')
-    expect(html).not.toContain('pieces/')
+    expect(html).toContain('data-onitama-canvas')
+    expect((html.match(/data-tent="/g) ?? []).length).toBe(2)
+    // the player to move sits nearest the camera
+    expect(html).toContain('data-tent="near"')
     expect(html).not.toContain('data-crown-cell')
   })
 
@@ -100,19 +100,31 @@ describe('onitama renders', () => {
   })
 })
 
-describe('animation plan', () => {
-  it('plans every real turn within the time cap, hiding only destinations that the new table renders', () => {
+describe('3D animation timeline', () => {
+  it('plans every real turn within the time cap: the moved piece, the two cards, and a camera swing to the next player', () => {
     let turns = 0
     for (const seed of [11, 12, 13]) {
       play(seed, (prev, next, events) => {
         const a = tableView(prev, seats)
         const b = tableView(next, seats)
-        const plan = planAnimation(events, a, b, false)
-        expect(plan.total).toBeLessThanOrEqual(MAX_TURN_MS)
-        const html = tv(next)
-        for (const anchor of plan.hidden) expect(html).toContain(`data-anchor="${anchor}"`)
-        // the used card and the taken card both fly every turn
-        expect(plan.flyers.length).toBeGreaterThanOrEqual(2)
+        const yaw = cameraYaw(viewerColor(a))
+        const tl = planTimeline(events, a, b, yaw, false)
+        expect(tl.total).toBeLessThanOrEqual(MAX_TURN_MS)
+        const finalPieces = piecePoses(b)
+        const finalCards = cardPoses(b)
+        for (const t of tl.tracks) {
+          const end = sampleTrack(t, t.start + t.duration)
+          const target = (t.kind === 'piece' ? finalPieces : finalCards).get(t.id)!
+          expect(end.x).toBeCloseTo(target.x, 6)
+          expect(end.z).toBeCloseTo(target.z, 6)
+          expect(t.start + t.duration).toBeLessThanOrEqual(tl.total + 1e-6)
+        }
+        // the used card and the taken card both move every turn
+        expect(tl.tracks.filter((t) => t.kind === 'card').length).toBe(2)
+        if (!b.finished) {
+          expect(tl.camera).not.toBeNull()
+          expect(Math.cos(tl.camera!.toYaw - cameraYaw(viewerColor(b)))).toBeCloseTo(1, 6)
+        }
         turns++
       })
     }

@@ -81,6 +81,9 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 
 ## 6. The phone: the player's private hand
 
+- **Both orientations:** every phone UI must work in portrait *and* landscape, re-laying out sensibly (e.g. board left, cards right in landscape) and scaling the main play area to fit, so it never disappears on small viewports. If a game truly needs one orientation, it must detect the wrong one and show a clear "rotate your phone" prompt (Joe, 2026-10-28).
+- **Selections are always visible:** every multi-step choice (card → piece → destination) marks the current selection distinctly on screen, not just in the confirm bar.
+
 - **Portrait first, never scrolls** (the phone shell is fixed full-viewport), 16px inputs (to stop iOS zooming), safe areas respected.
 - **The default tab is the most common action** (Splendor: Gems).
 - **The phone always shows what the player could do,** even off-turn (e.g. affordable marks). Off-turn, action buttons are hidden but browsing works. Pending sub-steps (discard, choose) take over the screen.
@@ -106,7 +109,7 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **Brightness and footprint:** normalise symbol images so each fills its image the same way and reads clearly on the table. Keep the originals in `tools/<slug>-art/originals/`, so processing is idempotent.
 - **Tokens and chips:** a subtle (blurred, low-opacity) background, with the symbol filling about 80% of the chip.
 - **Costs and requirements** show just the coloured shape and a number, with no tiny symbol inside (it reads as clutter).
-- **Typography:** use the **Cinzel** family (Cinzel 800 for numerals with lining and tabular digits, optically centred in their circles or squares; Cinzel Decorative for titles). Never IM Fell English, whose 1 looks Roman.
+- **Typography:** use the **Cinzel** family (Cinzel 800 for numerals with lining and tabular digits, optically centred in their circles or squares; Cinzel Decorative for titles). Never use IM Fell English for numbers (its 1 looks Roman). It is fine for wordmarks such as Onitama's card names, which copy Joe's original repo cards. A game based on Joe's own earlier design follows that design's typography.
 - **Match the real game's look as closely as possible (Joe's bar), without shipping the real images.** Dragonheart taught that freshly invented art reads as "cheesy" and loses the board's meaning. The method that works:
   - **img2img from the scans** with SDXL at low denoise (about 0.30–0.40), plus per-subject passes, so the composition, palette and every painted subject stay faithful while the pixels are newly generated. Clean seams and creases first.
   - On boards whose spaces have **painted subjects inside their outlines**, those must survive (they tell players what goes where). Keep the printed outlines and arrows in the art, and don't double-draw them in code.

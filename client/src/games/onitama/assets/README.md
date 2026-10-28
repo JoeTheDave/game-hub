@@ -29,3 +29,15 @@ Start ComfyUI with `~/ai/ComfyUI/start.sh --listen 127.0.0.1 --port 8188 --reser
 
 ## Sounds
 See `sounds/CREDITS.md` and `tools/onitama-art/make_sounds.py`. Run it with the ComfyUI venv's python (numpy + scipy) and ffmpeg.
+
+## Original repo art (iteration 1: the 3D table)
+Joe's own art from github.com/JoeTheDave/onitama, ported by `tools/onitama-art/port_repo_art.py <checkout>`:
+- `repo/svg/<card-id>.svg`: the animal for each card (from `old/src/components/svg/*.js`, with JSX expressions fixed to the repo's colours: characterColor for animals, opaqueWhite for the master icon), plus `swish.svg`, `master-icon.svg` and `logo.svg`.
+- `repo/*.webp`:
+  - `mural` (board top)
+  - `ying-yang`, `ying-yang-red`, `ying-yang-blue` (centre and temple homes)
+  - `card-texture`, `board-texture`
+  - `ink-fighters-one`, `ink-fighters-two` (the martial-arts decorations)
+  - `logo`
+
+Cards are drawn in the repo's design: as a landscape canvas texture on the TV (`cardArt.ts`), and as an upright DOM card on the phone (`components.tsx`). The TV's 3D pieces are procedural (`three/models.ts`); there are no piece images.
