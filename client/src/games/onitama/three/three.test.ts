@@ -154,3 +154,36 @@ describe('repo card art', () => {
     expect(wrapLines('short', 120, measure)).toEqual(['short'])
   })
 })
+
+describe('iteration 2: cards never wash out; calm, centred table', () => {
+  it('draws cards unlit with tone mapping off, so lights and the turn glow cannot blow them out', async () => {
+    const THREE = await import('three')
+    const { makeCardMaterial, makeGlowMaterial, RENDER_ORDER } = await import('./materials')
+    const card = makeCardMaterial(null)
+    expect(card).toBeInstanceOf(THREE.MeshBasicMaterial)
+    expect(card.toneMapped).toBe(false)
+    // The glow is normal-blended (additive turns a light board white) and drawn before cards.
+    const glow = makeGlowMaterial(null)
+    expect(glow.blending).toBe(THREE.NormalBlending)
+    expect(RENDER_ORDER.glow).toBeLessThan(RENDER_ORDER.card)
+    expect(RENDER_ORDER.grid).toBeLessThan(RENDER_ORDER.glow)
+  })
+
+  it('keeps the turn glow below the cards (it lay above them and washed the near card out)', async () => {
+    const g = await import('./geometry')
+    expect(g.GLOW_LIFT).toBeGreaterThan(g.GRID_LIFT)
+    expect(g.GLOW_LIFT).toBeLessThan(g.CARD_LIFT)
+    for (const c of ['red', 'blue'] as const) {
+      expect(handPose(c, 0).y).toBeCloseTo(g.BOARD_TOP + g.CARD_LIFT)
+      expect(sidePose(c).y).toBeCloseTo(g.BOARD_TOP + g.CARD_LIFT)
+    }
+  })
+
+  it('centres the slab under the camera so both flanks have equal room for the ink drawings', () => {
+    expect(CAMERA_TARGET.x).toBe(0)
+    expect(CAMERA_TARGET.z).toBe(0)
+    const a = cameraPosition(cameraYaw('blue'))
+    const b = cameraPosition(cameraYaw('red'))
+    expect(a.x).toBeCloseTo(-b.x)
+  })
+})

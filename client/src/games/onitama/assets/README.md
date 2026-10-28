@@ -41,3 +41,12 @@ Joe's own art from github.com/JoeTheDave/onitama, ported by `tools/onitama-art/p
   - `logo`
 
 Cards are drawn in the repo's design: as a landscape canvas texture on the TV (`cardArt.ts`), and as an upright DOM card on the phone (`components.tsx`). The TV's 3D pieces are procedural (`three/models.ts`); there are no piece images.
+
+## Iteration 2 — calm board top and light table (2026-10-28)
+- `board-top.webp` (2048², about 60 KB) comes from `tools/onitama-art/make_board.py`. It combines:
+  - the washi `parchment.webp` tiled 2×2 at its true aspect
+  - a faint ink-wash landscape: a centre-square crop of `mat.webp` (never stretched), mostly desaturated, multiplied in around the margins and faded out under the play area and card rows
+  - a soft paper vignette
+
+  Borders, slot frames, the grid and the yin-yangs are drawn in code (`three/scene.ts`). `python3 make_board.py --mock out.png` writes a top-down layout preview.
+- The TV no longer uses the repo `mural.webp` (it stretched) or `table.webp`; the phone still uses `table.webp`. The TV backdrop is light paper (CSS, `parchment.webp`). The repo ink drawings (`repo/ink-fighters-*.webp`) are shown black-on-white at full strength, multiplied onto it.

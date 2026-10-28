@@ -2,12 +2,16 @@
  * The 3D table for the TV, built with three.js in a <canvas> (not CSS 3D).
  *
  * - Board: the original repo's thick slab:
- *   - top: the mural, the board texture at 30%, the pale outer fade, double deep-red borders,
- *     and deep-red frames on the five card slots
+ *   - top: a calm washi surface with a faint ink-wash landscape in the margins (iteration 2;
+ *     the stretched repo mural was distracting), double deep-red borders, and deep-red frames on
+ *     the five card slots
  *   - grey edges with dark lines
  *   - the 5×5 action grid (translucent white squares with dark borders) over three slowly
  *     turning yin-yangs: the centre one and the red and blue temple homes
- * - Cards: flat textured planes painted from the repo's card design (`cardArt.ts`).
+ * - Cards: flat textured planes painted from the repo's card design (`cardArt.ts`), UNLIT so
+ *   lights and the turn glow can never wash them out (`materials.ts`).
+ * - The canvas is transparent: the light paper backdrop and the ink drawings are HTML behind it;
+ *   a shadow-catcher floor keeps the slab's soft shadow on that paper.
  * - Pieces: procedural lathe figures (`models.ts`) with soft shadows.
  * - Camera: a three-quarter view from behind the player to move. It swings 180° between turns.
  * - Rendering is on demand: full rate while anything moves, otherwise a low rate for the
@@ -18,7 +22,7 @@ import type { Color } from '@games/onitama/data'
 import type { OnitamaTableView } from '@games/onitama/engine'
 import { paintCard, loadCardFonts, loadCardImages, CARD_TEX_H, CARD_TEX_W } from '../cardArt'
 import { REPO, REPO_IMG } from '../cardStyle'
-import { TABLE_IMG } from '../assets'
+import { BOARD_TOP_IMG } from '../assets'
 import {
   BOARD_PX,
   BOARD_SIZE,
@@ -29,7 +33,9 @@ import {
   CARD_D,
   CARD_SLOTS_PX,
   CARD_W,
+  GLOW_LIFT,
   GRID,
+  GRID_LIFT,
   YIN_YANG,
   cameraPosition,
   cameraYaw,
@@ -37,6 +43,7 @@ import {
   type Pose,
 } from './geometry'
 import { makePiece, makePieceKit, type PieceKit } from './models'
+import { GLOW_OPACITY, RENDER_ORDER, makeCardMaterial, makeGlowMaterial, makeShadowCatcher } from './materials'
 import { cardPoses, piecePoses, sampleCamera, sampleTrack, viewerColor, type Timeline } from './timeline'
 
 /** True when a WebGL context can be created here (false in jsdom tests and very old TV browsers). */
@@ -68,43 +75,20 @@ const TEX = 2048
 const K = TEX / BOARD_PX
 
 /** Paint the board's top face (everything except the yin-yangs and the action grid). */
-function paintBoardTop(ctx: CanvasRenderingContext2D, mural?: HTMLImageElement, grain?: HTMLImageElement) {
-  ctx.fillStyle = '#c8c3b4'
+function paintBoardTop(ctx: CanvasRenderingContext2D, surface?: HTMLImageElement) {
+  ctx.fillStyle = '#efe6d2'
   ctx.fillRect(0, 0, TEX, TEX)
-  if (mural) ctx.drawImage(mural, 0, 0, TEX, TEX)
-  if (grain) {
-    ctx.globalAlpha = 0.3
-    const pat = ctx.createPattern(grain, 'repeat')
-    if (pat) {
-      ctx.fillStyle = pat
-      ctx.fillRect(0, 0, TEX, TEX)
-    }
-    ctx.globalAlpha = 1
-  }
-  // The repo's pale outer fade (inset 0 0 50px 30px rgb(200,200,200)).
-  const fade = 80 * K
-  const sides: [number, number, number, number, number, number, number, number][] = [
-    [0, 0, TEX, fade, 0, 0, 0, fade],
-    [0, TEX - fade, TEX, fade, 0, TEX, 0, TEX - fade],
-    [0, 0, fade, TEX, 0, 0, fade, 0],
-    [TEX - fade, 0, fade, TEX, TEX, 0, TEX - fade, 0],
-  ]
-  for (const [x, y, w, h, x0, y0, x1, y1] of sides) {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1)
-    g.addColorStop(0, 'rgba(200,200,200,0.95)')
-    g.addColorStop(1, 'rgba(200,200,200,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(x, y, w, h)
-  }
+  // The washi surface is square and mapped 1:1 onto the square slab top: never stretched.
+  if (surface) ctx.drawImage(surface, 0, 0, TEX, TEX)
   ctx.strokeStyle = REPO.deepRed
   ctx.lineWidth = 3 * K
   for (const m of [10, 20]) ctx.strokeRect((m + 1.5) * K, (m + 1.5) * K, (BOARD_PX - 2 * m - 3) * K, (BOARD_PX - 2 * m - 3) * K)
-  // Deep-red frames on the five card slots (10px borders, 400×260).
-  ctx.lineWidth = 10 * K
-  for (const s of CARD_SLOTS_PX) ctx.strokeRect((s.x + 5) * K, (s.y + 5) * K, 390 * K, 250 * K)
+  // Deep-red frames on the five card slots (400×260), a little finer than the repo's 10px.
+  ctx.lineWidth = 6 * K
+  for (const s of CARD_SLOTS_PX) ctx.strokeRect((s.x + 3) * K, (s.y + 3) * K, 394 * K, 254 * K)
 }
 
-/** Paint the action grid overlay (transparent elsewhere): the repo's 184px squares, 3px dark border. */
+/** Paint the action grid overlay (transparent elsewhere): the repo's 184px squares, thin ink border. */
 function paintGrid(ctx: CanvasRenderingContext2D) {
   ctx.clearRect(0, 0, TEX, TEX)
   for (let r = 0; r < 5; r++) {
@@ -112,11 +96,12 @@ function paintGrid(ctx: CanvasRenderingContext2D) {
       const x = (GRID.x + c * 188 + 2) * K
       const y = (GRID.y + r * 188 + 2) * K
       const s = 184 * K
-      ctx.fillStyle = REPO.opaqueWhite
+      // Quiet squares: a faint lighter wash with a thin ink line (subtle, but every square reads).
+      ctx.fillStyle = 'rgba(255,252,244,0.32)'
       ctx.fillRect(x, y, s, s)
-      ctx.strokeStyle = REPO.darkGray
-      ctx.lineWidth = 3 * K
-      ctx.strokeRect(x + 1.5 * K, y + 1.5 * K, s - 3 * K, s - 3 * K)
+      ctx.strokeStyle = 'rgba(46,34,22,0.6)'
+      ctx.lineWidth = 2 * K
+      ctx.strokeRect(x + 1 * K, y + 1 * K, s - 2 * K, s - 2 * K)
     }
   }
 }
@@ -138,7 +123,7 @@ function glowTexture(): THREE.CanvasTexture {
 interface CardObj {
   group: THREE.Group
   texture: THREE.CanvasTexture
-  material: THREE.MeshStandardMaterial
+  material: THREE.MeshBasicMaterial
 }
 
 export class OnitamaScene {
@@ -161,13 +146,15 @@ export class OnitamaScene {
   private cardGeo = new THREE.PlaneGeometry(CARD_W, CARD_D)
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: 'high-performance' })
+    // Transparent canvas: the light paper backdrop and ink drawings are HTML behind it.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' })
+    this.renderer.setClearColor(0x000000, 0)
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.05
-    this.scene.background = new THREE.Color(0x140e09)
+    this.renderer.toneMappingExposure = 0.95
+    this.scene.background = null
     this.camera = new THREE.PerspectiveCamera(CAMERA.fov, 16 / 9, 0.5, 200)
     this.kit = makePieceKit()
     this.disposables.push(this.kit, this.cardGeo)
@@ -183,17 +170,14 @@ export class OnitamaScene {
   private tex = new THREE.TextureLoader()
 
   private buildTable() {
-    // The table under the board (the texture doesn't tile: mirror it so the seams match).
-    const tableTex = loadTexture(this.tex, TABLE_IMG, () => this.markDirty())
-    tableTex.wrapS = tableTex.wrapT = THREE.MirroredRepeatWrapping
-    tableTex.repeat.set(3, 3)
-    const tableMat = new THREE.MeshStandardMaterial({ map: tableTex, roughness: 0.85, color: 0x8a7a68 })
-    const table = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), tableMat)
-    table.rotation.x = -Math.PI / 2
-    table.position.y = -0.002
-    table.receiveShadow = true
-    this.scene.add(table)
-    this.disposables.push(tableTex, tableMat, table.geometry)
+    // No table mesh: a transparent floor catches only the slab's soft shadow on the paper backdrop.
+    const floorMat = makeShadowCatcher()
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), floorMat)
+    floor.rotation.x = -Math.PI / 2
+    floor.position.y = -0.002
+    floor.receiveShadow = true
+    this.scene.add(floor)
+    this.disposables.push(floorMat, floor.geometry)
 
     // The board slab: painted top, grey edges, darker underside.
     const topCanvas = document.createElement('canvas')
@@ -203,29 +187,30 @@ export class OnitamaScene {
     const topTex = new THREE.CanvasTexture(topCanvas)
     topTex.colorSpace = THREE.SRGBColorSpace
     topTex.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
-    void Promise.all([loadImage(REPO_IMG.mural), loadImage(REPO_IMG.boardTexture)]).then(([mural, grain]) => {
+    void loadImage(BOARD_TOP_IMG).then((surface) => {
       if (this.disposed) return
-      paintBoardTop(topCtx, mural, grain)
+      paintBoardTop(topCtx, surface)
       topTex.needsUpdate = true
       this.markDirty()
     })
-    const edge = new THREE.MeshStandardMaterial({ color: 0x969696, roughness: 0.7 })
-    const top = new THREE.MeshStandardMaterial({ map: topTex, roughness: 0.75 })
-    const bottom = new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+    // Warm grey edges (the repo's grey, nudged warm to sit on the paper); a matte top.
+    const edge = new THREE.MeshStandardMaterial({ color: 0x8c857b, roughness: 0.8 })
+    const top = new THREE.MeshStandardMaterial({ map: topTex, roughness: 0.92 })
+    const bottom = new THREE.MeshStandardMaterial({ color: 0x3a3530 })
     const slab = new THREE.Mesh(new THREE.BoxGeometry(BOARD_SIZE, BOARD_THICK, BOARD_SIZE), [edge, edge, top, bottom, edge, edge])
     slab.position.y = BOARD_THICK / 2
     slab.receiveShadow = true
     slab.castShadow = true
     this.scene.add(slab)
-    const lines = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), new THREE.LineBasicMaterial({ color: 0x111111 }))
+    const lines = new THREE.LineSegments(new THREE.EdgesGeometry(slab.geometry), new THREE.LineBasicMaterial({ color: 0x3a2e24 }))
     lines.position.copy(slab.position)
     this.scene.add(lines)
     this.disposables.push(topTex, edge, top, bottom, slab.geometry, lines.geometry, lines.material as THREE.Material)
 
     // Yin-yangs (slowly turning, like the repo's 60 s rotation).
-    const yy = (url: string, x: number, z: number, size: number, y: number) => {
+    const yy = (url: string, x: number, z: number, size: number, y: number, opacity = 1) => {
       const t = loadTexture(this.tex, url, () => this.markDirty())
-      const m = new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.8, depthWrite: false })
+      const m = new THREE.MeshStandardMaterial({ map: t, transparent: true, opacity, roughness: 0.9, depthWrite: false })
       const mesh = new THREE.Mesh(new THREE.CircleGeometry(size / 2, 64), m)
       mesh.rotation.x = -Math.PI / 2
       mesh.position.set(x, BOARD_TOP + y, z)
@@ -234,7 +219,8 @@ export class OnitamaScene {
       this.spinners.push(mesh)
       this.disposables.push(t, m, mesh.geometry)
     }
-    yy(REPO_IMG.yinYang, YIN_YANG.centre.x, YIN_YANG.centre.z, YIN_YANG.centre.size, 0.002)
+    // The big centre yin-yang sits under the play area: softened so the grid stays calm.
+    yy(REPO_IMG.yinYang, YIN_YANG.centre.x, YIN_YANG.centre.z, YIN_YANG.centre.size, 0.002, 0.5)
     yy(REPO_IMG.yinYangRed, YIN_YANG.red.x, YIN_YANG.red.z, YIN_YANG.red.size, 0.003)
     yy(REPO_IMG.yinYangBlue, YIN_YANG.blue.x, YIN_YANG.blue.z, YIN_YANG.blue.size, 0.003)
 
@@ -248,15 +234,19 @@ export class OnitamaScene {
     const gridMat = new THREE.MeshStandardMaterial({ map: gridTex, transparent: true, roughness: 0.8, depthWrite: false })
     const grid = new THREE.Mesh(new THREE.PlaneGeometry(BOARD_SIZE, BOARD_SIZE), gridMat)
     grid.rotation.x = -Math.PI / 2
-    grid.position.y = BOARD_TOP + 0.005
+    grid.position.y = BOARD_TOP + GRID_LIFT
     grid.receiveShadow = true
+    grid.renderOrder = RENDER_ORDER.grid
     this.scene.add(grid)
     this.disposables.push(gridTex, gridMat, grid.geometry)
   }
 
   private buildLights() {
-    this.scene.add(new THREE.HemisphereLight(0xfff1dc, 0x2a1d12, 0.75))
-    const key = new THREE.DirectionalLight(0xfff0d8, 2.1)
+    // Gentle light for a light table: soft sky, a moderate key for the pieces' form and shadows.
+    // Total light on the board top stays near 1.4x, so the washi keeps its texture under ACES
+    // instead of blowing out to white (cards are unlit and unaffected).
+    this.scene.add(new THREE.HemisphereLight(0xfff6e8, 0x6b5a48, 0.65))
+    const key = new THREE.DirectionalLight(0xfff0d8, 1.15)
     key.position.set(-6, 18, 9)
     key.castShadow = true
     key.shadow.mapSize.set(2048, 2048)
@@ -275,10 +265,12 @@ export class OnitamaScene {
 
   private buildGlow(): THREE.Mesh {
     const t = glowTexture()
-    const m = new THREE.MeshBasicMaterial({ map: t, color: 0xffc470, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+    const m = makeGlowMaterial(t)
     const g = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), m)
     g.rotation.x = -Math.PI / 2
-    g.position.y = BOARD_TOP + 0.02
+    // Below the cards (GLOW_LIFT < CARD_LIFT) and drawn before them: it can never cover a card.
+    g.position.y = BOARD_TOP + GLOW_LIFT
+    g.renderOrder = RENDER_ORDER.glow
     this.scene.add(g)
     this.disposables.push(t, m, g.geometry)
     return g
@@ -306,10 +298,10 @@ export class OnitamaScene {
     const texture = new THREE.CanvasTexture(canvas)
     texture.colorSpace = THREE.SRGBColorSpace
     texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy()
-    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.82, transparent: true })
+    const material = makeCardMaterial(texture)
     const mesh = new THREE.Mesh(this.cardGeo, material)
     mesh.rotation.x = -Math.PI / 2
-    mesh.receiveShadow = true
+    mesh.renderOrder = RENDER_ORDER.card
     const group = new THREE.Group()
     group.add(mesh)
     this.scene.add(group)
@@ -389,7 +381,7 @@ export class OnitamaScene {
     this.glow.position.x = g.x
     this.glow.position.z = g.z
     this.glow.scale.set(g.w, g.d, 1)
-    this.glowTarget = 0.85
+    this.glowTarget = GLOW_OPACITY
     if (mat.opacity === 0) mat.opacity = 0.01
   }
 

@@ -41,7 +41,10 @@ export function squareWorld([x, y]: readonly [number, number]): { x: number; z: 
 /** Which way a colour's cards face: text upright for that player. */
 export const facingYaw = (color: Color): number => (color === 'red' ? Math.PI : 0)
 
-const CARD_LIFT = 0.012
+/** Heights above the board top: grid overlay < turn glow < cards, so the glow never covers a card. */
+export const GRID_LIFT = 0.005
+export const GLOW_LIFT = 0.007
+export const CARD_LIFT = 0.012
 
 /** A player's hand slot (index 0 or 1) — the repo's two card positions on their side of the board. */
 export function handPose(color: Color, index: number): Pose {
@@ -91,10 +94,10 @@ export const CARD_SLOTS_PX = [
 export const CAMERA = { distance: 25, elevation: (56 * Math.PI) / 180, fov: 38 } as const
 export const cameraYaw = (color: Color): number => (color === 'red' ? Math.PI : 0)
 /**
- * The point the camera orbits: the middle of the slab, nudged toward the grid. At 16:9 this frames
- * the whole slab (corners within ±0.93 of the viewport) from either side.
+ * The point the camera orbits: the middle of the slab, so it sits centred with equal room on both
+ * sides for the flanking ink drawings. At 16:9 the corners stay within ±0.93 of the viewport.
  */
-export const CAMERA_TARGET = { x: wx(860), y: 0, z: 0 } as const
+export const CAMERA_TARGET = { x: 0, y: 0, z: 0 } as const
 
 export function cameraPosition(yaw: number): { x: number; y: number; z: number } {
   const flat = CAMERA.distance * Math.cos(CAMERA.elevation)

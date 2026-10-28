@@ -67,6 +67,20 @@ describe('onitama renders', () => {
     expect(html).not.toContain('data-crown-cell')
   })
 
+  it('sits the TV on light paper with the ink drawings at full strength, flanking the board', () => {
+    const [start] = play(3)
+    const html = tv(start)
+    expect(html).toContain('data-onitama-backdrop')
+    expect(html).toContain('#efe7d5')
+    for (const side of ['left', 'right']) {
+      const m = html.match(new RegExp(`<img[^>]*data-ink="${side}"[^>]*>`))
+      expect(m, side).not.toBeNull()
+      expect(m![0]).toContain('mix-blend-mode:multiply')
+      expect(m![0]).toContain('opacity:1')
+      expect(m![0]).not.toContain('invert')
+    }
+  })
+
   it('draws each phone from its own side, with my cards and the opponent\'s', () => {
     const [start] = play(4)
     for (const seat of [0, 1]) {

@@ -4,7 +4,7 @@ import type { OnitamaTableView, PublicPlayer } from '@games/onitama/engine'
 import type { GameSummary } from '../../types/game'
 import { SeriesTable, seatHex, INK } from './components'
 import { seriesSummary, wayLine } from './logic'
-import { TABLE_IMG, preloadImages } from './assets'
+import { PARCHMENT_IMG, preloadImages } from './assets'
 import { REPO_IMG } from './cardStyle'
 import { OnitamaScene, webglAvailable } from './three/scene'
 import { planTimeline, viewerColor, MAX_TURN_MS as TL_MAX } from './three/timeline'
@@ -104,23 +104,22 @@ export function TableView({ instance, view, events, seq, onEventsDone, sound }: 
   const far = view.players.find((p) => p.seat !== near?.seat)
 
   return (
-    <div
-      className="absolute inset-0 overflow-hidden"
-      style={{ background: '#140e09', backgroundImage: `url(${TABLE_IMG})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
-    >
+    <div data-onitama-backdrop="" className="absolute inset-0 overflow-hidden" style={BACKDROP}>
+      {/* The repo's martial-arts ink drawings, at their default black-on-white (multiplied onto the
+          paper so the white disappears), large and flanking the board. Behind the transparent canvas. */}
+      <img data-ink="left" src={REPO_IMG.inkOne} alt="" draggable={false} style={{ ...INK_DRAWING, left: '1.2vw' }} />
+      <img data-ink="right" src={REPO_IMG.inkTwo} alt="" draggable={false} style={{ ...INK_DRAWING, right: '1.2vw' }} />
+
       <canvas ref={canvasRef} data-onitama-canvas="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: noGl ? 'none' : 'block' }} />
 
-      {/* The repo's martial-arts ink decorations, faint in the corners of the table. */}
-      <img src={REPO_IMG.inkOne} alt="" draggable={false} style={{ ...decor, left: '-2vw', bottom: '-3vh' }} />
-      <img src={REPO_IMG.inkTwo} alt="" draggable={false} style={{ ...decor, right: '-2vw', top: '-3vh', transform: 'scaleX(-1)' }} />
-      <img src={REPO_IMG.logo} alt="Onitama" draggable={false} style={{ position: 'absolute', right: '2.2vw', bottom: '2.6vh', width: '11vw', opacity: 0.55, pointerEvents: 'none', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,.6))' }} />
+      <img src={REPO_IMG.logo} alt="Onitama" draggable={false} style={{ position: 'absolute', right: '2.2vw', bottom: '2.6vh', width: '11vw', opacity: 0.9, pointerEvents: 'none' }} />
 
       {/* Name tents: the player the camera is behind is nearest (bottom); the opponent across the table (top). */}
       {far && <NameTent p={far} pos="far" toMove={!view.finished && settled && view.turn === far.seat} />}
       {near && <NameTent p={near} pos="near" toMove={!view.finished && settled && view.turn === near.seat} />}
 
       {noGl && (
-        <div className="oni-serif" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f3e8cf', fontSize: 26, textAlign: 'center', padding: 40 }}>
+        <div className="oni-serif" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3a2a1a', fontSize: 26, textAlign: 'center', padding: 40 }}>
           This screen can&apos;t draw the 3D table (WebGL isn&apos;t available in this browser).
         </div>
       )}
@@ -130,12 +129,27 @@ export function TableView({ instance, view, events, seq, onEventsDone, sound }: 
   )
 }
 
-const decor = {
+/** Warm light paper (washi) behind the transparent 3D canvas, with a soft vignette. */
+export const BACKDROP = {
+  backgroundColor: '#efe7d5',
+  backgroundImage: `radial-gradient(ellipse at 50% 45%, rgba(255,252,244,0.55) 0%, rgba(255,252,244,0) 55%, rgba(120,96,64,0.18) 100%), url(${PARCHMENT_IMG})`,
+  backgroundSize: 'cover, 512px 512px',
+} as const
+
+/**
+ * The ink drawings: full strength, black on white, multiplied onto the paper. Vertically centred
+ * beside the board. The slab is centred and at mid-height spans about the middle 55% of the
+ * screen, so 19vw on each side stays clear of it and of the corner name tents and logo.
+ */
+export const INK_DRAWING = {
   position: 'absolute' as const,
-  width: '26vw',
-  opacity: 0.1,
-  filter: 'invert(1) sepia(0.5)',
-  mixBlendMode: 'screen' as const,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: '19vw',
+  maxHeight: '40vh',
+  objectFit: 'contain' as const,
+  opacity: 1,
+  mixBlendMode: 'multiply' as const,
   pointerEvents: 'none' as const,
 }
 
@@ -160,7 +174,9 @@ function NameTent({ p, pos, toMove }: { p: PublicPlayer; pos: 'near' | 'far'; to
           padding: '0.5vh 1.1vw',
           borderRadius: 4,
           background: 'linear-gradient(180deg, #f6ecd4 0%, #e6d6b2 60%, #d6c29a 100%)',
-          boxShadow: toMove ? '0 0 26px 6px rgba(255,196,112,.55), 0 3px 6px rgba(0,0,0,.45)' : '0 3px 6px rgba(0,0,0,.45)',
+          // On light paper: a soft drop shadow and a fine ink outline; a warm glow when it's their move.
+          boxShadow: toMove ? '0 0 22px 6px rgba(255,170,70,.55), 0 2px 5px rgba(60,40,20,.3)' : '0 2px 5px rgba(60,40,20,.3)',
+          outline: '1px solid rgba(60,40,20,.25)',
           color: '#2a1d12',
           fontSize: pos === 'near' ? 'max(18px, 1.7vw)' : 'max(15px, 1.3vw)',
           lineHeight: 1.15,
