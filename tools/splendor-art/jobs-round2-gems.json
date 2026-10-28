@@ -1,0 +1,130 @@
+[
+ {
+  "name": "r2-gold-101",
+  "prompt": "a small solid polished gold bullion bar ingot, trapezoid shape with beveled edges, bright metallic yellow gold with mirror-like reflections and specular highlights, a small stamped crown mark on top, opaque solid metal, not translucent, not amber, single gold bar game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 101,
+  "steps": 24
+ },
+ {
+  "name": "r2-gold-202",
+  "prompt": "a small solid polished gold bullion bar ingot, trapezoid shape with beveled edges, bright metallic yellow gold with mirror-like reflections and specular highlights, a small stamped crown mark on top, opaque solid metal, not translucent, not amber, single gold bar game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 202,
+  "steps": 24
+ },
+ {
+  "name": "r2-gold-303",
+  "prompt": "a small solid polished gold bullion bar ingot, trapezoid shape with beveled edges, bright metallic yellow gold with mirror-like reflections and specular highlights, a small stamped crown mark on top, opaque solid metal, not translucent, not amber, single gold bar game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 303,
+  "steps": 24
+ },
+ {
+  "name": "r2-gold-404",
+  "prompt": "a small solid polished gold bullion bar ingot, trapezoid shape with beveled edges, bright metallic yellow gold with mirror-like reflections and specular highlights, a small stamped crown mark on top, opaque solid metal, not translucent, not amber, single gold bar game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 404,
+  "steps": 24
+ },
+ {
+  "name": "r2-blue-101",
+  "prompt": "a vivid royal blue sapphire gemstone, oval brilliant cut with many sharp triangular facets, sparkling, clearly a faceted cut gemstone, deep saturated blue with bright white facet glints, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 101,
+  "steps": 24
+ },
+ {
+  "name": "r2-blue-202",
+  "prompt": "a vivid royal blue sapphire gemstone, oval brilliant cut with many sharp triangular facets, sparkling, clearly a faceted cut gemstone, deep saturated blue with bright white facet glints, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 202,
+  "steps": 24
+ },
+ {
+  "name": "r2-blue-303",
+  "prompt": "a vivid royal blue sapphire gemstone, oval brilliant cut with many sharp triangular facets, sparkling, clearly a faceted cut gemstone, deep saturated blue with bright white facet glints, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 303,
+  "steps": 24
+ },
+ {
+  "name": "r2-blue-404",
+  "prompt": "a vivid royal blue sapphire gemstone, oval brilliant cut with many sharp triangular facets, sparkling, clearly a faceted cut gemstone, deep saturated blue with bright white facet glints, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 404,
+  "steps": 24
+ },
+ {
+  "name": "r2-black-101",
+  "prompt": "a black onyx gemstone, cushion brilliant cut with many crisp sharp facets, glossy jet black stone with bright silver-white facet reflections and glints, clearly a faceted cut gemstone, like a black diamond, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 101,
+  "steps": 24
+ },
+ {
+  "name": "r2-black-202",
+  "prompt": "a black onyx gemstone, cushion brilliant cut with many crisp sharp facets, glossy jet black stone with bright silver-white facet reflections and glints, clearly a faceted cut gemstone, like a black diamond, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 202,
+  "steps": 24
+ },
+ {
+  "name": "r2-black-303",
+  "prompt": "a black onyx gemstone, cushion brilliant cut with many crisp sharp facets, glossy jet black stone with bright silver-white facet reflections and glints, clearly a faceted cut gemstone, like a black diamond, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 303,
+  "steps": 24
+ },
+ {
+  "name": "r2-black-404",
+  "prompt": "a black onyx gemstone, cushion brilliant cut with many crisp sharp facets, glossy jet black stone with bright silver-white facet reflections and glints, clearly a faceted cut gemstone, like a black diamond, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, soft studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 404,
+  "steps": 24
+ },
+ {
+  "name": "r2-blackB-515",
+  "prompt": "a faceted black onyx gemstone, cushion cut with many sharp triangular facets, glossy black stone, every facet edge catches bright white and silver reflections, strong sparkling highlights across the crown, dark gray facets alternating with near-black ones, clearly a cut jewel, black diamond style, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, bright studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 515,
+  "steps": 24
+ },
+ {
+  "name": "r2-blackB-616",
+  "prompt": "a faceted black onyx gemstone, cushion cut with many sharp triangular facets, glossy black stone, every facet edge catches bright white and silver reflections, strong sparkling highlights across the crown, dark gray facets alternating with near-black ones, clearly a cut jewel, black diamond style, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, bright studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 616,
+  "steps": 24
+ },
+ {
+  "name": "r2-blackB-717",
+  "prompt": "a faceted black onyx gemstone, cushion cut with many sharp triangular facets, glossy black stone, every facet edge catches bright white and silver reflections, strong sparkling highlights across the crown, dark gray facets alternating with near-black ones, clearly a cut jewel, black diamond style, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, bright studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 717,
+  "steps": 24
+ },
+ {
+  "name": "r2-blackB-818",
+  "prompt": "a faceted black onyx gemstone, cushion cut with many sharp triangular facets, glossy black stone, every facet edge catches bright white and silver reflections, strong sparkling highlights across the crown, dark gray facets alternating with near-black ones, clearly a cut jewel, black diamond style, single gemstone game token art, realistic glossy rendering, three-quarter top view, centered, fills two thirds of the frame, bright studio light from top-left, crisp specular highlights, isolated on a flat uniform medium gray background, no shadow, no text",
+  "width": 768,
+  "height": 768,
+  "seed": 818,
+  "steps": 24
+ }
+]

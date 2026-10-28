@@ -2,7 +2,7 @@ import { randomInt } from 'crypto'
 import { Prisma } from '@prisma/client'
 import prisma from './prisma.js'
 import { GAMES, getGame } from '../games/registry.js'
-import type { GameEvent, GameModule, GameSummary, Rng, SeatInfo } from '../games/types.js'
+import { resolveOptions, type GameEvent, type GameModule, type GameOptionValues, type GameSummary, type Rng, type SeatInfo } from '../games/types.js'
 import { emitToSeat, emitToTable } from './socket.js'
 
 export type Phase = 'lobby' | 'playing' | 'finished'
@@ -13,6 +13,10 @@ export interface StoredGameState {
   state?: unknown
   /** One summary per completed game in this instance (kept across rematches; public). */
   history?: GameSummary[]
+  /** Lobby options chosen for this instance (validated against the game's schema; kept across rematches). */
+  options?: GameOptionValues
+  /** The seat holding the admin role (Start, Rematch, options, handing the role on). Default 0. */
+  adminSeat?: number
 }
 
 export const instanceInclude = {
@@ -49,7 +53,18 @@ export function withInstanceLock<T>(id: string, fn: (tx: Prisma.TransactionClien
 export function storedState(instance: { gameState: Prisma.JsonValue | null }): StoredGameState {
   const gs = instance.gameState as Partial<StoredGameState> | null
   const phase: Phase = gs?.phase === 'playing' || gs?.phase === 'finished' ? gs.phase : 'lobby'
-  return { phase, state: gs?.state, history: Array.isArray(gs?.history) ? gs.history : [] }
+  return {
+    phase,
+    state: gs?.state,
+    history: Array.isArray(gs?.history) ? gs.history : [],
+    options: gs?.options && typeof gs.options === 'object' ? gs.options : {},
+    adminSeat: typeof gs?.adminSeat === 'number' ? gs.adminSeat : 0,
+  }
+}
+
+/** The instance's options with the game's defaults filled in. */
+export function instanceOptions(instance: LoadedInstance): GameOptionValues {
+  return resolveOptions(moduleFor(instance)?.options, storedState(instance).options)
 }
 
 /**
@@ -81,7 +96,7 @@ export function moduleFor(instance: LoadedInstance): GameModule<unknown, unknown
  * engine state only through tableView (never raw).
  */
 export function lobbySafe(instance: LoadedInstance) {
-  const { phase, state, history } = storedState(instance)
+  const { phase, state, history, adminSeat } = storedState(instance)
   const mod = moduleFor(instance)
   return {
     id: instance.id,
@@ -106,6 +121,11 @@ export function lobbySafe(instance: LoadedInstance) {
     tableView: phase !== 'lobby' && mod && state !== undefined ? mod.tableView(state, seatInfos(instance)) : null,
     /** Completed games in this instance (series across rematches), oldest first. */
     history: history ?? [],
+    /** The game's lobby settings and their current values. */
+    optionsSchema: mod?.options ?? [],
+    options: resolveOptions(mod?.options, storedState(instance).options),
+    /** The seat holding the admin role (phones use it; the TV never shows it). */
+    adminSeat: adminSeat ?? 0,
   }
 }
 

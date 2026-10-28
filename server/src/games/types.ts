@@ -30,6 +30,11 @@ export interface GameModule<S, A> {
    * code, tests and existing instances, but no new instance can be created through the API.
    */
   listed?: boolean
+  /**
+   * Optional per-game settings chosen in the lobby (by the host or the admin player) and passed
+   * to `setup` as `options` (a `Record<key, boolean>` with defaults filled in). Rematches keep them.
+   */
+  options?: GameOption[]
   /** Called on Start with the seated players (ordered by playerOrder). Deterministic given rng. */
   setup(players: SeatInfo[], rng: Rng, options?: unknown): { state: S; events: GameEvent[] }
   /** Validate + apply one action from a seat. Pure: never mutates the input state. */
@@ -51,6 +56,24 @@ export interface GameModule<S, A> {
    * and cumulative totals. Null while the game is unfinished.
    */
   summary?(state: S): GameSummary | null
+}
+
+/** A lobby setting a game offers. Only boolean (checkbox) options for now. */
+export interface GameOption {
+  key: string
+  label: string
+  type: 'boolean'
+  default: boolean
+}
+
+export type GameOptionValues = Record<string, boolean>
+
+/** The schema's defaults overlaid with any stored values whose key/type match the schema. */
+export function resolveOptions(schema: GameOption[] | undefined, values: unknown): GameOptionValues {
+  const out: GameOptionValues = {}
+  const v = values && typeof values === 'object' ? (values as Record<string, unknown>) : {}
+  for (const o of schema ?? []) out[o.key] = typeof v[o.key] === 'boolean' ? (v[o.key] as boolean) : o.default
+  return out
 }
 
 /** One completed game's result, as recorded in an instance's match history. */

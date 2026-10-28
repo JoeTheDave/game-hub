@@ -8,6 +8,7 @@ import {
   broadcastInstance,
   historyAfter,
   instanceInclude,
+  instanceOptions,
   loadInstance,
   lobbySafe,
   moduleFor,
@@ -231,24 +232,28 @@ async function setUpGame(req: Request, res: Response, from: 'lobby' | 'finished'
     if (!instance) return { status: 404, error: 'Game not found' } as const
     const mod = moduleFor(instance)
     if (!mod) return { status: 400, error: 'Unknown game type' } as const
+    const stored = storedState(instance)
     const isHost = sessionUserId(req) === instance.hostUserId
-    if (!isHost && !seatTokenValid(instance, 0, joinToken)) {
+    if (!isHost && !seatTokenValid(instance, stored.adminSeat, joinToken)) {
       return {
         status: 403,
-        error: from === 'lobby' ? 'Only the host or the first player can start the game' : 'Only the host or the first player can start a rematch',
+        error: from === 'lobby' ? 'Only the host or the admin player can start the game' : 'Only the host or the admin player can start a rematch',
       } as const
     }
-    const { phase: phase0, history: history0 } = storedState(instance)
+    const { phase: phase0, history: history0 } = stored
     if (from === 'lobby' && phase0 !== 'lobby') return { status: 400, error: 'Game already started or finished' } as const
     if (from === 'finished' && phase0 !== 'finished') return { status: 400, error: 'The game is not over yet' } as const
     if (instance.players.length < mod.minPlayers) return { status: 400, error: 'Not enough players' } as const
-    const { state, events } = mod.setup(seatInfos(instance), serverRng)
+    // The lobby options (defaults filled in) reach setup; a rematch keeps them.
+    const options = instanceOptions(instance)
+    const { state, events } = mod.setup(seatInfos(instance), serverRng, options)
     const phase = mod.isFinished(state) ? 'finished' : 'playing'
     // A rematch continues the series; a game started from the lobby begins a new one.
     const history = from === 'finished' ? (history0 ?? []) : []
+    const next: StoredGameState = { phase, state, history, options: stored.options, adminSeat: stored.adminSeat }
     await tx.gameInstance.update({
       where: { id },
-      data: { gameState: { phase, state, history } as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
+      data: { gameState: next as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
     })
     return { status: 200, events } as const
   })
@@ -258,7 +263,7 @@ async function setUpGame(req: Request, res: Response, from: 'lobby' | 'finished'
   res.json(lobbySafe(updated))
 }
 
-// Start: the host (session) or seat 0 (joinToken), once enough players have joined.
+// Start: the host (session) or the admin seat (joinToken), once enough players have joined.
 router.post('/games/instances/:id/start', async (req: Request, res: Response) => {
   try {
     await setUpGame(req, res, 'lobby')
@@ -278,6 +283,78 @@ router.post('/games/instances/:id/rematch', async (req: Request, res: Response) 
   }
 })
 
+/** Who may change lobby options / the admin role: the host's session, or the admin seat's joinToken. */
+function isAdminRequest(req: Request, instance: NonNullable<Awaited<ReturnType<typeof loadInstance>>>): boolean {
+  const { playerOrder, joinToken } = req.body as { playerOrder?: unknown; joinToken?: unknown }
+  if (sessionUserId(req) === instance.hostUserId) return true
+  const admin = storedState(instance).adminSeat ?? 0
+  return playerOrder === admin && seatTokenValid(instance, admin, joinToken)
+}
+
+// Lobby options (game-defined checkboxes). Host or admin seat; lobby only; validated against the schema.
+router.patch('/games/instances/:id/options', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { options } = req.body as { options?: unknown }
+    const outcome = await withInstanceLock(id, async (tx) => {
+      const instance = await loadInstance(id, tx)
+      if (!instance) return { status: 404, error: 'Game not found' } as const
+      const mod = moduleFor(instance)
+      if (!mod) return { status: 400, error: 'Unknown game type' } as const
+      if (!isAdminRequest(req, instance)) return { status: 403, error: 'Only the host or the admin player can change options' } as const
+      const stored = storedState(instance)
+      if (stored.phase !== 'lobby') return { status: 400, error: 'Options can only change in the lobby' } as const
+      if (!options || typeof options !== 'object' || Array.isArray(options)) return { status: 400, error: 'options must be an object' } as const
+      const schema = mod.options ?? []
+      const next = { ...(stored.options ?? {}) }
+      for (const [key, value] of Object.entries(options as Record<string, unknown>)) {
+        const opt = schema.find((o) => o.key === key)
+        if (!opt) return { status: 400, error: `Unknown option: ${key}` } as const
+        if (typeof value !== 'boolean') return { status: 400, error: `Option ${key} must be true or false` } as const
+        next[key] = value
+      }
+      const gameState: StoredGameState = { ...stored, options: next }
+      await tx.gameInstance.update({ where: { id }, data: { gameState: gameState as unknown as Prisma.InputJsonValue, version: { increment: 1 } } })
+      return { status: 200 } as const
+    })
+    if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error })
+    const updated = (await loadInstance(id))!
+    broadcastInstance(updated)
+    res.json(lobbySafe(updated))
+  } catch (error) {
+    console.error('Options error:', error)
+    res.status(500).json({ error: 'Failed to update options' })
+  }
+})
+
+// Hand the admin role to another seated player. Only the current admin (or the host); any phase;
+// the new admin isn't asked (their phone just gains the admin controls).
+router.post('/games/instances/:id/admin', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { newAdmin } = req.body as { newAdmin?: unknown }
+    const outcome = await withInstanceLock(id, async (tx) => {
+      const instance = await loadInstance(id, tx)
+      if (!instance) return { status: 404, error: 'Game not found' } as const
+      if (!isAdminRequest(req, instance)) return { status: 403, error: 'Only the admin player can hand on the admin role' } as const
+      if (typeof newAdmin !== 'number' || !instance.players.some((p) => p.playerOrder === newAdmin)) {
+        return { status: 400, error: 'newAdmin must be a seated player' } as const
+      }
+      const stored = storedState(instance)
+      const gameState: StoredGameState = { ...stored, adminSeat: newAdmin }
+      await tx.gameInstance.update({ where: { id }, data: { gameState: gameState as unknown as Prisma.InputJsonValue, version: { increment: 1 } } })
+      return { status: 200 } as const
+    })
+    if (outcome.status !== 200) return res.status(outcome.status).json({ error: outcome.error })
+    const updated = (await loadInstance(id))!
+    broadcastInstance(updated)
+    res.json(lobbySafe(updated))
+  } catch (error) {
+    console.error('Admin transfer error:', error)
+    res.status(500).json({ error: 'Failed to change the admin' })
+  }
+})
+
 // One action from a seat. Authenticated by joinToken; applied by the game's engine.
 router.post('/games/instances/:id/action', async (req: Request, res: Response) => {
   try {
@@ -294,7 +371,8 @@ router.post('/games/instances/:id/action', async (req: Request, res: Response) =
     const seat = playerOrder as number
     const mod = moduleFor(instance)
     if (!mod) return res.status(400).json({ error: 'Unknown game type' })
-    const { phase, state, history } = storedState(instance)
+    const stored = storedState(instance)
+    const { phase, state, history } = stored
     if (phase !== 'playing' || state === undefined) return res.status(400).json({ error: 'Game is not in progress' })
     if (typeof version === 'number' && version !== instance.version) {
       return res.status(409).json({ error: 'The game changed — try again', playerView: playerViewFor(instance, seat), version: instance.version })
@@ -304,7 +382,7 @@ router.post('/games/instances/:id/action', async (req: Request, res: Response) =
     const nextPhase = mod.isFinished(result.state) ? 'finished' : 'playing'
     // The finishing move records this game's result in the instance's match history (once).
     const nextHistory = historyAfter(mod, phase, nextPhase, result.state, history ?? [])
-    if (!(await versionedWrite(id, instance.version, { phase: nextPhase, state: result.state, history: nextHistory }))) {
+    if (!(await versionedWrite(id, instance.version, { ...stored, phase: nextPhase, state: result.state, history: nextHistory }))) {
       const fresh = await loadInstance(id)
       return res.status(409).json({
         error: 'The game changed — try again',

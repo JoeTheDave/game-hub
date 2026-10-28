@@ -31,6 +31,19 @@ export interface GameInstance {
   tableView: unknown
   /** Completed games in this instance, oldest first (a series across rematches). */
   history?: GameSummary[]
+  /** The game's lobby settings (checkboxes) and their current values (defaults filled in). */
+  optionsSchema?: GameOption[]
+  options?: Record<string, boolean>
+  /** The seat holding the admin role (Start, Rematch, options). Phones only; the TV never shows it. */
+  adminSeat?: number
+}
+
+/** A lobby setting a game offers (boolean checkbox). */
+export interface GameOption {
+  key: string
+  label: string
+  type: 'boolean'
+  default: boolean
 }
 
 /** One completed game's result: final score per seat (index = playerOrder) and winning seats. */

@@ -6,7 +6,9 @@ Every sound has a rounded attack (5-15 ms), is low-passed (no harsh highs or whi
 bursts), and is normalized to a quiet peak (about -12 dBFS). The table also plays them at
 reduced gain in code.
 
-Usage: python make_sounds.py OUT_DIR   (needs numpy, scipy, ffmpeg with libmp3lame)
+Usage: python make_sounds.py OUT_DIR [--only name1,name2]   (needs numpy, scipy, ffmpeg with libmp3lame)
+
+Play-test round 2 (spec 1793147156389): chip-single/chip-multi are soft glass tinks at -16 dBFS.
 """
 import os, subprocess, sys, tempfile
 import numpy as np
@@ -58,15 +60,30 @@ def clay_click(pitch=1500, d=0.09, amp=1.0):
     return amp * lowpass(0.6 * ping + 0.5 * body + 0.15 * tex, 3500)
 
 
+def glass_tink(pitch=2100, d=0.32, amp=1.0, decay=0.11):
+    """A soft crystalline tink (play-test round 2: the clay clicks were disliked).
+
+    Sine partials at inharmonic, glass-like ratios; each higher partial decays faster, so the
+    sound starts bright but settles into a pure, gentle ring. Rounded 4 ms attack, no noise.
+    """
+    n = int(SR * d)
+    x = t(d)
+    sig = np.zeros(n)
+    for ratio, gain, dec in ((1.0, 1.0, decay), (2.32, 0.30, decay * 0.55), (4.25, 0.12, decay * 0.32), (6.63, 0.05, decay * 0.22)):
+        sig += gain * np.sin(2 * np.pi * pitch * ratio * x + rng.uniform(0, 2 * np.pi)) * env(n, 0.004, dec)
+    return amp * lowpass(sig, 6500)
+
+
 def chip_single():
-    return place(0.16, [(0, clay_click(1450))])
+    return place(0.34, [(0, glass_tink(2100))])
 
 
 def chip_multi():
+    # A gentle little cascade: 3 tinks, slightly different pitches, softer as they go.
     parts = []
-    for k in range(3):
-        parts.append((k * 0.075 + rng.uniform(0, 0.015), clay_click(rng.uniform(1250, 1650), amp=rng.uniform(0.65, 1.0))))
-    return place(0.36, parts)
+    for k, (p, a) in enumerate(((2250, 1.0), (1980, 0.78), (2420, 0.6))):
+        parts.append((k * 0.085 + rng.uniform(0, 0.012), glass_tink(p * rng.uniform(0.985, 1.015), amp=a)))
+    return place(0.56, parts)
 
 
 def swish(d, lo=250, hi=1600, amp=1.0):
@@ -133,6 +150,9 @@ def fanfare():
     return place(1.5, parts)
 
 
+# Per-sound peak (dBFS) where it differs from PEAK: the gem tinks sit quieter than the rest.
+PEAKS = {'chip-single': -16, 'chip-multi': -16}
+
 SOUNDS = {
     'chip-single': chip_single, 'chip-multi': chip_multi, 'card-slide': card_slide, 'card-flip': card_flip,
     'deck-deal': deck_deal, 'noble-chime': noble_chime, 'turn-tick': turn_tick, 'fanfare': fanfare,
@@ -140,10 +160,15 @@ SOUNDS = {
 
 if __name__ == '__main__':
     out = sys.argv[1]
+    only = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv else None
     os.makedirs(out, exist_ok=True)
     for name, fn in SOUNDS.items():
-        sig = lowpass(fn(), 5000, 2)  # final gentle high cut on everything
-        sig = sig / (np.max(np.abs(sig)) + 1e-9) * PEAK
+        if only and name not in only:
+            continue
+        # final gentle high cut (the tinks keep a little more air so they read as glass)
+        sig = lowpass(fn(), 7000 if name.startswith('chip') else 5000, 2)
+        peak = 10 ** (PEAKS[name] / 20) if name in PEAKS else PEAK
+        sig = sig / (np.max(np.abs(sig)) + 1e-9) * peak
         fin = min(len(sig), int(SR * 0.006))
         sig[:fin] *= np.linspace(0, 1, fin)
         fade = min(len(sig), int(SR * 0.03))

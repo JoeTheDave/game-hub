@@ -5,6 +5,7 @@ import { fetchApi } from '../lib/api'
 import { soundBoard } from '../lib/soundBoard'
 import { COLOR_BG_CLASSES } from '../lib/playerColors'
 import { useTableFeed } from '../hooks/useTableFeed'
+import { GameOptions } from '../components/GameOptions'
 
 /** The host's lobby screen (usually the TV): QR code to join, roster, and Start. Game-agnostic. */
 export function HostLobbyPage() {
@@ -45,6 +46,16 @@ export function HostLobbyPage() {
       setError(err instanceof Error ? err.message : 'Failed to start')
     } finally {
       setStarting(false)
+    }
+  }
+
+  // The host can set the game's lobby options (the admin player can too, from their phone).
+  const setOption = async (key: string, value: boolean) => {
+    setError('')
+    const res = await fetchApi(`/api/games/instances/${id}/options`, { method: 'PATCH', body: JSON.stringify({ options: { [key]: value } }) })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError(data.error || 'Could not change that option')
     }
   }
 
@@ -97,6 +108,11 @@ export function HostLobbyPage() {
               </ul>
             </div>
           </div>
+          {(instance.optionsSchema?.length ?? 0) > 0 && (
+            <div className="mt-6 rounded-xl bg-black/25 px-4 py-3">
+              <GameOptions instance={instance} editable onChange={(k, v) => void setOption(k, v)} />
+            </div>
+          )}
           {error && <div className="mt-6 p-3 rounded-lg bg-red-500/20 text-red-200 text-sm">{error}</div>}
           <button
             type="button"

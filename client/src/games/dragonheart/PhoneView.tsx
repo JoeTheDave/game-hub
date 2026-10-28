@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { AdminMenu } from '../../components/AdminMenu'
 import type { PhoneViewProps } from '../types'
 import type { DragonheartAction, DragonheartPlayerView } from '@games/dragonheart/engine'
 import { CARD_BY_ID, GREAT_DRAGON_POINTS, KIND_NAMES } from '@games/dragonheart/data'
@@ -43,7 +44,7 @@ const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] curso
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
-export function PhoneView({ instance, view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
+export function PhoneView({ instance, view, playerOrder, sendAction, pending, error, clearError, rematch, admin }: PhoneViewProps<DragonheartPlayerView, DragonheartAction>) {
   const [selected, setSelected] = useState<string[]>([])
   const [pileOpen, setPileOpen] = useState(false)
   const me = view.players.find((p) => p.seat === playerOrder)
@@ -99,6 +100,7 @@ export function PhoneView({ instance, view, playerOrder, sendAction, pending, er
             <span className="text-amber-300 text-xs">pts</span>
             {hasDragon && <span className="text-amber-300 text-sm font-bold">{`+${GREAT_DRAGON_POINTS}`}</span>}
           </button>
+          {admin && <AdminMenu {...admin} />}
         </div>
       </div>
 

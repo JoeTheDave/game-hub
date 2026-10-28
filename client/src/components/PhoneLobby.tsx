@@ -3,6 +3,9 @@ import { fetchApi } from '../lib/api'
 import { PLAYER_COLORS, COLOR_BG_CLASSES } from '../lib/playerColors'
 import type { SeatCredentials } from '../lib/seat'
 import type { GameInstance } from '../types/game'
+import { useAdmin } from '../hooks/useAdmin'
+import { GameOptions } from './GameOptions'
+import { AdminMenu } from './AdminMenu'
 
 interface Props {
   instance: GameInstance
@@ -11,8 +14,9 @@ interface Props {
 }
 
 /**
- * Game-agnostic phone lobby: name, color, roster. The first player to join (seat 0) gets a
- * Start Game button once at least minPlayers have joined — no "admin" labelling.
+ * Game-agnostic phone lobby: name, color, roster, the game's options. The admin seat (the first
+ * to join, unless the role was handed on) gets the Start Game button once at least minPlayers have
+ * joined, can edit the options, and has the Players menu to hand the role on. There's no "admin" label.
  */
 export function PhoneLobby({ instance, seat, onInstance }: Props) {
   const { playerOrder, joinToken } = seat
@@ -22,6 +26,7 @@ export function PhoneLobby({ instance, seat, onInstance }: Props) {
   const [startError, setStartError] = useState('')
 
   const me = instance.players.find((p) => p.playerOrder === playerOrder)
+  const { isAdmin, setOption, promote } = useAdmin(instance, seat, onInstance)
   useEffect(() => {
     if (me && pendingName === '') setPendingName(me.screenName)
     if (me && pendingColor === null) setPendingColor(me.color ?? null)
@@ -136,8 +141,11 @@ export function PhoneLobby({ instance, seat, onInstance }: Props) {
         <div className="rounded-2xl bg-white/5 border border-white/10 p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Players</span>
-            <span className="text-xs font-semibold text-slate-300">
-              {instance.players.length}/{maxPlayers}
+            <span className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-300">
+                {instance.players.length}/{maxPlayers}
+              </span>
+              <AdminMenu isAdmin={isAdmin} playerOrder={playerOrder} players={instance.players} promote={promote} />
             </span>
           </div>
           <ul className="flex flex-col gap-1.5">
@@ -161,7 +169,8 @@ export function PhoneLobby({ instance, seat, onInstance }: Props) {
             })}
           </ul>
         </div>
-        {playerOrder === 0 && canStart ? (
+        <GameOptions instance={instance} editable={isAdmin} onChange={(k, v) => void setOption(k, v)} />
+        {isAdmin && canStart ? (
           <button
             type="button"
             onClick={handleStart}

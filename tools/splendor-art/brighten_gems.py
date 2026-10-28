@@ -26,11 +26,11 @@ RADIUS = 0.475  # farthest opaque pixel from centre, as a fraction of the canvas
 # brightness, colour (saturation), contrast, gamma (<1 lifts mid-tones)
 ADJUST = {
     "white": (1.05, 1.00, 1.16, 0.95),
-    "blue": (1.50, 1.12, 1.04, 0.75),
+    "blue": (1.15, 1.05, 1.04, 0.92),  # round 2: the new faceted sapphire needs only a light lift
     "green": (1.32, 1.15, 1.08, 0.85),
     "red": (1.45, 1.15, 1.08, 0.80),
-    "black": (1.50, 0.80, 1.18, 0.82),
-    "gold": (1.18, 1.12, 1.06, 0.90),
+    "black": (1.08, 0.85, 1.28, 0.97),  # round 2: new faceted onyx is already lit; keep it black
+    "gold": (1.05, 1.05, 1.04, 0.97),  # round 2: the new metal bar is already bright
 }
 
 

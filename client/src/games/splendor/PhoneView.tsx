@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { AdminMenu } from '../../components/AdminMenu'
 import type { PhoneViewProps } from '../types'
 import type { SplendorAction, SplendorPlayerView } from '@games/splendor/engine'
 import { CARD_BY_ID, TOKENS, type Gem, type Tier, type Token as TokenKind } from '@games/splendor/data'
@@ -46,7 +47,7 @@ const btn = 'rounded-xl font-bold transition-transform active:scale-[0.97] curso
 const primaryBtn = `${btn} bg-amber-400 text-stone-900 shadow-lg shadow-black/40`
 const ghostBtn = `${btn} bg-white/10 text-amber-50 border border-white/15`
 
-export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError, rematch }: PhoneViewProps<SplendorPlayerView, SplendorAction>) {
+export function PhoneView({ view, playerOrder, sendAction, pending, error, clearError, rematch, admin }: PhoneViewProps<SplendorPlayerView, SplendorAction>) {
   const [tab, setTab] = useState<Tab>('gems')
   const [sheet, setSheet] = useState<Sheet>(null)
   const me = view.players.find((p) => p.seat === playerOrder)
@@ -94,6 +95,7 @@ export function PhoneView({ view, playerOrder, sendAction, pending, error, clear
           )}
           <span className="spl-numeral text-3xl">{me?.points ?? 0}</span>
           <span className="text-amber-300 text-xs">pts</span>
+          {admin && <AdminMenu {...admin} />}
         </div>
         <div className="mt-1.5 grid grid-cols-6 gap-1">
           {TOKENS.map((t) => (

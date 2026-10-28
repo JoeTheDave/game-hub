@@ -13,6 +13,8 @@ import prisma from '../lib/prisma.js'
 import { createApp } from '../app.js'
 import { syncGameCatalog } from '../lib/gameInstances.js'
 import { createInstanceDirect } from '../test/instances.js'
+import { getGame } from '../games/registry.js'
+import type { GameModule } from '../games/types.js'
 
 let app: Express
 let host: ReturnType<typeof request.agent>
@@ -343,5 +345,122 @@ describe('rematch', () => {
     const fresh = await startedGame()
     const inst = await request(app).get(`/api/games/instances/${fresh.id}`)
     expect(inst.body.history).toEqual([])
+  })
+})
+
+describe('lobby options (platform)', () => {
+  // Tic-Tac-Toe has no options of its own; give it one for these tests, then restore.
+  let ttt: GameModule<unknown, unknown>
+  let original: GameModule<unknown, unknown>['options']
+  beforeAll(() => {
+    ttt = getGame('tic-tac-toe') as GameModule<unknown, unknown>
+    original = ttt.options
+    ttt.options = [{ key: 'fancy', label: 'Fancy mode', type: 'boolean', default: false }]
+  })
+  afterAll(() => {
+    ttt.options = original
+    vi.restoreAllMocks()
+  })
+
+  it('exposes the schema and defaults, and lets the admin seat change them in the lobby', async () => {
+    const inst = await createInstance()
+    const a = (await join(inst.id)).body.player
+    const b = (await join(inst.id)).body.player
+    let got = await request(app).get(`/api/games/instances/${inst.id}`)
+    expect(got.body.optionsSchema).toEqual([{ key: 'fancy', label: 'Fancy mode', type: 'boolean', default: false }])
+    expect(got.body.options).toEqual({ fancy: false })
+    expect(got.body.adminSeat).toBe(0)
+
+    // Not the admin: refused.
+    let r = await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 1, joinToken: b.joinToken, options: { fancy: true } })
+    expect(r.status).toBe(403)
+    // Unknown key / wrong type: refused.
+    r = await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 0, joinToken: a.joinToken, options: { nope: true } })
+    expect(r.status).toBe(400)
+    r = await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 0, joinToken: a.joinToken, options: { fancy: 'yes' } })
+    expect(r.status).toBe(400)
+    // The admin seat: accepted, and nothing secret comes back.
+    r = await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 0, joinToken: a.joinToken, options: { fancy: true } })
+    expect(r.status).toBe(200)
+    expect(r.body.options).toEqual({ fancy: true })
+    expect(JSON.stringify(r.body)).not.toContain(a.joinToken)
+    // The host's session can change them too.
+    r = await host.patch(`/api/games/instances/${inst.id}/options`).send({ options: { fancy: false } })
+    expect(r.status).toBe(200)
+    r = await host.patch(`/api/games/instances/${inst.id}/options`).send({ options: { fancy: true } })
+    got = await request(app).get(`/api/games/instances/${inst.id}`)
+    expect(got.body.options).toEqual({ fancy: true })
+  })
+
+  it('passes the options to setup on Start and again on Rematch, and refuses changes after the lobby', async () => {
+    const spy = vi.spyOn(ttt, 'setup')
+    const inst = await createInstance()
+    const a = (await join(inst.id)).body.player
+    const b = (await join(inst.id)).body.player
+    await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 0, joinToken: a.joinToken, options: { fancy: true } })
+    const start = await request(app).post(`/api/games/instances/${inst.id}/start`).send({ joinToken: a.joinToken })
+    expect(start.status).toBe(200)
+    expect(spy.mock.calls.at(-1)?.[2]).toEqual({ fancy: true })
+    const late = await request(app).patch(`/api/games/instances/${inst.id}/options`).send({ playerOrder: 0, joinToken: a.joinToken, options: { fancy: false } })
+    expect(late.status).toBe(400)
+    // Finish the game (X wins), then rematch: the same options reach setup.
+    for (const [seat, row, col] of [[0, 0, 0], [1, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 2]] as const) {
+      const tok = seat === 0 ? a.joinToken : b.joinToken
+      const r = await request(app).post(`/api/games/instances/${inst.id}/action`).send({ playerOrder: seat, joinToken: tok, action: { type: 'place', row, col } })
+      expect(r.status).toBe(200)
+    }
+    // The finishing move keeps the stored options (actions don't drop platform fields).
+    const finished = await request(app).get(`/api/games/instances/${inst.id}`)
+    expect(finished.body.options).toEqual({ fancy: true })
+    const rm = await request(app).post(`/api/games/instances/${inst.id}/rematch`).send({ joinToken: a.joinToken })
+    expect(rm.status).toBe(200)
+    expect(spy.mock.calls.at(-1)?.[2]).toEqual({ fancy: true })
+    spy.mockRestore()
+  })
+})
+
+describe('admin transfer (platform)', () => {
+  it('only the admin can hand on the role; afterwards the new admin starts and rematches, the old one cannot', async () => {
+    const inst = await createInstance()
+    const a = (await join(inst.id)).body.player
+    const b = (await join(inst.id)).body.player
+    // Seat 1 can't make itself admin.
+    let r = await request(app).post(`/api/games/instances/${inst.id}/admin`).send({ playerOrder: 1, joinToken: b.joinToken, newAdmin: 1 })
+    expect(r.status).toBe(403)
+    // Not a seated player: refused.
+    r = await request(app).post(`/api/games/instances/${inst.id}/admin`).send({ playerOrder: 0, joinToken: a.joinToken, newAdmin: 5 })
+    expect(r.status).toBe(400)
+    // The admin hands it on (no consent needed from seat 1).
+    r = await request(app).post(`/api/games/instances/${inst.id}/admin`).send({ playerOrder: 0, joinToken: a.joinToken, newAdmin: 1 })
+    expect(r.status).toBe(200)
+    expect(r.body.adminSeat).toBe(1)
+    expect(JSON.stringify(r.body)).not.toContain(a.joinToken)
+    expect(JSON.stringify(r.body)).not.toContain(b.joinToken)
+    // The old admin lost Start; the new one has it.
+    r = await request(app).post(`/api/games/instances/${inst.id}/start`).send({ joinToken: a.joinToken })
+    expect(r.status).toBe(403)
+    r = await request(app).post(`/api/games/instances/${inst.id}/start`).send({ joinToken: b.joinToken })
+    expect(r.status).toBe(200)
+    // Mid-game hand-back works (any phase), and the role survives actions.
+    r = await request(app).post(`/api/games/instances/${inst.id}/action`).send({ playerOrder: 0, joinToken: a.joinToken, action: { type: 'place', row: 0, col: 0 } })
+    expect(r.status).toBe(200)
+    let got = await request(app).get(`/api/games/instances/${inst.id}`)
+    expect(got.body.adminSeat).toBe(1)
+    // Finish (X = seat 0 wins), then only the new admin can rematch.
+    for (const [seat, row, col] of [[1, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 2]] as const) {
+      const tok = seat === 0 ? a.joinToken : b.joinToken
+      const m = await request(app).post(`/api/games/instances/${inst.id}/action`).send({ playerOrder: seat, joinToken: tok, action: { type: 'place', row, col } })
+      expect(m.status).toBe(200)
+    }
+    r = await request(app).post(`/api/games/instances/${inst.id}/rematch`).send({ joinToken: a.joinToken })
+    expect(r.status).toBe(403)
+    r = await request(app).post(`/api/games/instances/${inst.id}/rematch`).send({ joinToken: b.joinToken })
+    expect(r.status).toBe(200)
+    got = await request(app).get(`/api/games/instances/${inst.id}`)
+    expect(got.body.adminSeat).toBe(1)
+    // The new admin can hand it back.
+    r = await request(app).post(`/api/games/instances/${inst.id}/admin`).send({ playerOrder: 1, joinToken: b.joinToken, newAdmin: 0 })
+    expect(r.status).toBe(200)
+    expect(r.body.adminSeat).toBe(0)
   })
 })

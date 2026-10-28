@@ -8,6 +8,7 @@ import { useGameModule } from '../hooks/useGameModule'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { PhoneLobby } from '../components/PhoneLobby'
 import type { GameInstance } from '../types/game'
+import { useAdmin } from '../hooks/useAdmin'
 
 function Message({ children }: { children: React.ReactNode }) {
   return <div className={`${PHONE_SCREEN_CLASS} items-center justify-center px-6 text-center text-slate-400`}>{children}</div>
@@ -24,6 +25,7 @@ export function PlayPage() {
   const mod = useGameModule(gameSlug)
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const { isAdmin, promote } = useAdmin(instance, seat, acceptInstance)
 
   // No seat on this device: send them through the join page while the lobby is open.
   const notSeated = !seat || error === 'not-seated'
@@ -64,7 +66,7 @@ export function PlayPage() {
     [id, seat, acceptView]
   )
 
-  // Rematch (seat 0 only, once the game is over): the same instance restarts, so every screen
+  // Rematch (the admin seat only, once the game is over): the same instance restarts, so every screen
   // follows along over its socket with no navigation.
   const rematch = useCallback(async () => {
     if (!id || !seat) return false
@@ -72,7 +74,7 @@ export function PlayPage() {
     try {
       const res = await fetchApi(`/api/games/instances/${id}/rematch`, {
         method: 'POST',
-        body: JSON.stringify({ joinToken: seat.joinToken }),
+        body: JSON.stringify({ playerOrder: seat.playerOrder, joinToken: seat.joinToken }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -124,7 +126,8 @@ export function PlayPage() {
         pending={pending}
         error={actionError}
         clearError={() => setActionError(null)}
-        rematch={instance.phase === 'finished' && seat!.playerOrder === 0 ? rematch : undefined}
+        rematch={instance.phase === 'finished' && isAdmin ? rematch : undefined}
+        admin={{ isAdmin, playerOrder: seat!.playerOrder, players: instance.players, promote }}
       />
     </div>
   )

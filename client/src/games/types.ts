@@ -41,6 +41,21 @@ export interface PhoneViewProps<V = unknown, A = unknown> {
    * true on success; on failure the message appears in `error`.
    */
   rematch?: () => Promise<boolean>
+  /**
+   * The admin role, from the platform. When `isAdmin`, place the shared `<AdminMenu {...admin} />`
+   * (client/src/components/AdminMenu.tsx) unobtrusively in the phone header: it lets the admin hand
+   * the role to another player, after a confirmation.
+   */
+  admin?: AdminControls
+}
+
+export interface AdminControls {
+  isAdmin: boolean
+  /** This phone's seat. */
+  playerOrder: number
+  players: LobbyPlayer[]
+  /** Make another seat the admin. Resolves true on success. */
+  promote: (seat: number) => Promise<boolean>
 }
 
 export interface ClientGameModule {

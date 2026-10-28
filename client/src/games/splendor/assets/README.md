@@ -78,3 +78,23 @@ The white gem was regenerated as a classic brilliant cut seen from the side, lik
 - Then the stone was rotated 18° counter-clockwise so the pavilion points to the lower right, and fitted to 448 px.
 
 The result is `tools/splendor-art/originals/gems/white.webp`. `brighten_gems.py` then adds contrast for darker facets: `white: (1.05, 1.00, 1.16, 0.95)`.
+
+## Play-test round 2 (spec 1793147156389)
+
+### Gems: gold, sapphire, onyx regenerated
+Players said the gold looked like amber, the sapphire didn't read as a gem, and the onyx looked strange.
+- Prompts and seeds: `tools/splendor-art/jobs-round2-gems.json` (Flux fp8, euler, 24 steps, 768², ComfyUI started with `--disable-smart-memory --fp32-vae`).
+- Picks:
+  - gold = `r2-gold-404`: a polished gold bullion bar with a small stamped crown
+  - blue = `r2-blue-202`: an oval brilliant-cut sapphire
+  - black = `r2-blackB-515`: a cushion-cut faceted onyx with bright facet glints
+- Cutout: `/tmp/rembgenv/bin/python tools/splendor-art/cut_gems.py gold=<raw> blue=<raw> black=<raw>` writes `originals/gems/`.
+- Then `python3 tools/splendor-art/brighten_gems.py`. Its blue, black and gold adjustments were re-tuned (lighter touch) for the new renders; white, green and red are unchanged.
+
+### Gem token sounds
+`chip-single` and `chip-multi` are now soft glass "tinks" (inharmonic sine partials, 4 ms attack, short decay) at -16 dBFS, replacing the disliked clay clicks. To regenerate: `python make_sounds.py client/src/games/splendor/assets/sounds --only chip-single,chip-multi` (needs numpy and scipy, e.g. the ComfyUI venv).
+
+### Noble portraits pool: 32 added (p-01..p-32)
+- Sliced from Joe's two 4×4 grids (vault `Splendor Card Scans/Noble Portraits - Grid 1.png` and `Grid 2.png`) with `python3 tools/splendor-art/slice_portraits.py "<Grid 1>" "<Grid 2>" [--sheet contact.jpg]`.
+- Gutters are detected from brightness profiles; each tile is cropped 12 px inside its gutters and saved at 512² WebP q85.
+- `n-01..n-10` are unchanged, so the pool is now 42 portraits.
