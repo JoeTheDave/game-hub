@@ -223,4 +223,10 @@ Built from Joe's own repo (github.com/JoeTheDave/onitama), using its card data, 
 - Migration `20250809000000_add_example_users` seeds `alice@example.com`/`bob@example.com` into every environment.
 
 ## Tagged Versions
+- v1.1.0 (2026-11-08): two new games and platform growth.
+  - **Dragonheart** (2p): Joe's board and scan-derived cards, stack points, the dragon token, the series table.
+  - **Onitama** (2p): from Joe's repo; a three.js 3D table that turns to the player to move, a portrait/landscape phone.
+  - **Splendor round 2:** random turn order, new gem art and sounds, Joe's 32 noble portraits, a randomize-cards option.
+  - **Platform:** home cover cards, rematch with series history, lobby options, admin hand-off, wake lock, unselectable game screens; Tic-Tac-Toe retired.
+  - **Fixes:** TV feed lag, flight layering and gray boxes, join/start lock edge cases, the wake-lock leak.
 - v1.0.0 (2026-10-26): first tagged release. Adds the game-module framework (self-contained games, per-viewer hidden info, joinToken-authenticated actions, headless simulation), moves tic-tac-toe onto it, and adds Splendor for 2–4 players with a tabletop TV, phone hands, generated art, animation and sound. Also fixes the phone lobby UX, sync after reconnects, and the `/api/users` password-hash leak.
