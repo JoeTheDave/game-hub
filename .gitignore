@@ -54,3 +54,6 @@ Thumbs.db
 *.temp
 # Workflow specs (local only)
 .specs/
+
+# Local tooling timestamp (not project content)
+.last-accessed
