@@ -38,7 +38,9 @@ TBD. Obvious comparison: Jackbox Games (paid, closed catalog). Other comparisons
 - MVP: platform loop (auth, game catalog, create/lobby/join/start, live sync) proven with tic-tac-toe ✅
 - Game-module framework: each game self-contained (rules engine + TV view + phone view), headless-simulatable ✅ (v1.0.0)
 - Splendor, the first full board game, with a tabletop TV, private phone hands, animation and sound ✅ (v1.0.0)
-- Dragonheart (2 players), the second full board game, built from the playbook (in progress)
+- Dragonheart (2 players), the second full board game, built from the playbook ✅ (v1.1.0)
+- Onitama (2 players), from Joe's own repo, with a 3D canvas table ✅ (v1.1.0)
+- Platform: home cover cards, rematch with series history, lobby options, admin hand-off ✅ (v1.1.0)
 - Later: train a neural network on simulated games (the engines already support headless simulation)
 - Then: build a shared kit of tabletop components (cards, decks, dice, boards, tokens) that games compose, more games, game-specific creation options, and a real landing page (currently a blank placeholder)
 

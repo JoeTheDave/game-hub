@@ -75,6 +75,19 @@ describe('startWakeLock', () => {
     expect(f.listeners.focus?.size ?? 0).toBe(0)
   })
 
+  it('never holds two locks when visibilitychange and focus fire together while a request is in flight', async () => {
+    const f = fakes()
+    const stop = startWakeLock({ wakeLock: f.wakeLock, doc: f.doc, win: f.win })
+    // the initial request is still in flight when both events fire
+    f.fire('visibilitychange')
+    f.fire('focus')
+    await tick()
+    expect(f.sentinels).toHaveLength(1)
+    stop()
+    await tick()
+    expect(f.sentinels.every((s) => s.released)).toBe(true)
+  })
+
   it('is a no-op where the Wake Lock API is unsupported', () => {
     const f = fakes()
     const stop = startWakeLock({ doc: f.doc, win: f.win })

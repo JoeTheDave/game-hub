@@ -1,7 +1,7 @@
 # GameHub — Technical Reference
 
 ## What This Is
-A multiplayer party-game hub with games as self-contained modules (tic-tac-toe, Splendor): a signed-in host creates a game and shows it on a shared screen, and players join from their phones via QR code or join code and play through a phone "controller", with live sync over Socket.IO. It deploys as a single Fly.io app (`sage-game-hub`, region `dfw`) where Express serves both the API and the built React client. The app is currently **suspended** (last release v7, 2026-03-14).
+A multiplayer party-game hub with games as self-contained modules (Splendor, Dragonheart, Onitama; Tic-Tac-Toe retired): a signed-in host creates a game and shows it on a shared screen, and players join from their phones via QR code or join code and play through a phone "controller", with live sync over Socket.IO. It deploys as a single Fly.io app (`sage-game-hub`, region `dfw`) where Express serves both the API and the built React client. The app is currently **suspended** (last release v7, 2026-03-14).
 
 ## Workflow
 ```yaml
@@ -100,8 +100,8 @@ game-hub/
 | `/error`, `*` | ErrorPage | – | |
 
 ## Games
-### Tic-Tac-Toe (2 players)
-The proof-of-concept game. The TV shows a big 3×3 board with a stamp effect and sound when a mark lands. Each phone shows the board with its own mark and whose turn it is.
+### Tic-Tac-Toe (2 players), retired
+The proof-of-concept game. It's retired from selection (`listed: false`): it no longer appears on the home page, in Create Game or in `GET /api/games`, and the API refuses new instances. Its code and tests remain, and existing instances still play.
 
 ### Splendor (2–4 players)
 A full implementation of the base game, built from scans of Joe's physical copy. The scans are reference only and never ship.
@@ -134,6 +134,60 @@ A full implementation of the base game, built from scans of Joe's physical copy.
   - Exactly one image per gem. `brighten_gems.py` reprocesses them idempotently from `originals/`.
   - Numerals use Cinzel; the card-back title uses Cinzel Decorative over a lightly blurred engraving.
 - **Simulation:** `npm run simulate -- splendor --games 2000 --players 2` runs about 2,100 games/sec, deterministic from the seed, for future neural-network training data.
+- **Round 2 (play-test):**
+  - The turn order is a random permutation every game.
+  - Soft glass "tink" gem sounds.
+  - Regenerated gold bar, sapphire and onyx art.
+  - Noble portraits come from Joe's 32 (`p-01..p-32`, randomly paired each game; the original 10 are retired).
+  - A `randomizeCards` lobby option generates a balanced deck (`generate.ts`; `cardDefs` in state, sent to each viewer only for the cards they can see).
+  - A blue affordable highlight, a crown column on the final scores, and Rematch with no series display.
+
+### Dragonheart (2 players)
+Rüdiger Dorn's card game, built from Joe's scans: the rulebook, board and card notes live in the vault at `Projects/game-hub/Dragonheart/`.
+- **Rules** (`server/src/games/dragonheart/`):
+  - Each player has a 50-card deck (green or red, by seat).
+  - **Spaces:** nine, each holding one card type. Stack spaces show their top card; capacity spaces fill up: Knight 2, Huntress 3, Ship 3, Dwarf 4.
+  - **Space effects:**
+    - Fire Dragon takes the Treasure stack.
+    - Sorceress takes Treasure *or* Petrified (taking Petrified also takes the Great Dragon).
+    - Troll takes the Sorceress stack.
+    - The 4th Dwarf collects the Dwarfs.
+    - The 2nd Knight takes Sorceress *or* Troll, and the Knights then go below the Ship.
+    - The 3rd Huntress takes Fire Dragon, and the Huntresses go below the Ship.
+    - The 3rd Ship takes the below-Ship pile and forms a ship stack.
+  - **Great Dragon:** raises your hand size to 6. Stealing it puts a random card from the opponent's hand back on their deck.
+  - **End:** the 3rd ship stack, or a player who can't draw. Either way the other player gets one final turn.
+  - **Scoring:** cards plus 3 for the Great Dragon, who also wins ties.
+  - **Public info:** each space's points, the top of each score pile, and play previews with their points.
+- **TV:**
+  - **Board:** Joe's board painting (`assets/board/panorama.webp`), with the Knight/Troll → Sorceress arrows transplanted from his reference image (`transplant_arrows.py`). `boardGeometry.json` holds the outline positions measured on that board.
+  - **Cards:** clipped from the board image at outline size (`clip_cards.py`), under a frame derived from the scans (`make_frame.py`) with Cinzel numerals.
+  - **Other pieces:** a milky board shade, Joe's silver dragon coin as the token, and subtle `N pts` notes on stacks (only when 2 or more cards, and never 0 points).
+  - **Piles:** face-up piles render and hide as one unit (`PileFace`), and piece images are pre-decoded so nothing flashes gray.
+- **Phone:** your hand, same-kind selection with a points preview, header status, the dragon +3, and a fixed action area.
+- **End screen:** Final Score with a crown column, the series table and Rematch.
+
+### Onitama (2 players)
+Built from Joe's own repo (github.com/JoeTheDave/onitama), using its card data, artwork and look.
+- **Rules** (`server/src/games/onitama/`):
+  - 32 cards (base 16 plus the Sensei's Path 16, toggled by the `senseisPath` option, on by default); colours are random each game.
+  - Win by capturing the master (Stone), or by moving your master onto the enemy temple (Stream).
+  - If no move is legal you must pass a card. A 200-ply cap ends the game in a draw.
+- **TV:** a three.js canvas (`three/`).
+  - **Board:** a slab with a washi top (`make_board.py`), the repo's yin-yangs, and card slots.
+  - **Pieces and cards:** procedural student and master models; card textures in the repo's card style (`cardArt.ts`).
+  - **Camera:** swings 180° to the player to move.
+  - **Backdrop:** a light paper background with the repo's ink fighters. Rendering is on demand.
+- **Phone:** works in portrait and landscape (`phoneLayout`). Pick a card, then a piece, then a square, with the selection marked (ring, ghost piece, arrow) and an inline confirm. Moves that put your master in danger are tinted.
+
+## Platform features (since v1.0.0)
+- **Home page:** large cover cards, one per listed game (`client/src/games/<slug>/cover.webp`, via `gameCover()`). Clicking one creates the game and opens its lobby.
+- **Lobby options:** declared by `GameModule.options` (boolean), stored in `gameState.options`, set via `PATCH /games/instances/:id/options`, and passed to `setup`. They render generically on the host lobby and the admin's phone.
+- **Admin:** `gameState.adminSeat` (default 0) holds Start, Rematch and options rights. `POST /games/instances/:id/admin` hands it over through the phone `AdminMenu`, with a confirmation step.
+- **Rematch:** `POST /games/instances/:id/rematch` (admin or host, on a finished game) re-runs setup on the same instance, keeping its tokens, options, admin and history. The TV resets without animating (`isFreshStart`).
+- **Series history:** `gameState.history` gets one `GameModule.summary()` per finished game. Dragonheart and Onitama show a series table; Splendor intentionally doesn't.
+- **Wake lock:** `useWakeLock` keeps the screen awake on TV and phone game screens.
+- **Unselectable game screens:** `.game-surface` on the TV and phone shells.
 
 ## Environment Variables
 | Variable | Where Set | Notes |

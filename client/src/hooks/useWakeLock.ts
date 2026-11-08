@@ -22,22 +22,31 @@ export function startWakeLock(env: WakeLockEnv): () => void {
   if (!wl) return () => {}
   let sentinel: Sentinel | null = null
   let disposed = false
-  const acquire = async () => {
-    if (disposed || env.doc.visibilityState !== 'visible') return
-    if (sentinel && !sentinel.released) return
-    try {
-      const s = await wl.request('screen')
-      if (disposed) {
-        void s.release()
-        return
+  // One request at a time: visibilitychange and focus often fire together, and two overlapping
+  // requests would each get a lock, with only the last one ever released.
+  let pending: Promise<void> | null = null
+  const acquire = (): Promise<void> => {
+    if (disposed || env.doc.visibilityState !== 'visible') return Promise.resolve()
+    if (sentinel && !sentinel.released) return Promise.resolve()
+    if (pending) return pending
+    pending = (async () => {
+      try {
+        const s = await wl.request('screen')
+        if (disposed) {
+          void s.release()
+          return
+        }
+        sentinel = s
+        s.addEventListener('release', () => {
+          if (sentinel === s) sentinel = null
+        })
+      } catch {
+        // Denied (e.g. battery saver) or not allowed right now: retried on the next visibility/focus.
+      } finally {
+        pending = null
       }
-      sentinel = s
-      s.addEventListener('release', () => {
-        if (sentinel === s) sentinel = null
-      })
-    } catch {
-      // Denied (e.g. battery saver) or not allowed right now: retried on the next visibility/focus.
-    }
+    })()
+    return pending
   }
   const onVisible = () => {
     if (env.doc.visibilityState === 'visible') void acquire()
