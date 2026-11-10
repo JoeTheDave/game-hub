@@ -34,7 +34,8 @@ let stalled = 0
 let totalTurns = 0
 const t0 = performance.now()
 for (let g = 0; g < games; g++) {
-  const r = simulate(game, { players, seed: seed + g })
+  // Real-time games run their own physics-and-bots match runner.
+  const r = game.simulateHeadless ? game.simulateHeadless({ players, seed: seed + g }) : simulate(game, { players, seed: seed + g })
   totalTurns += r.turns
   if (r.stalled) stalled++
   else if (r.winners.length !== 1) draws++

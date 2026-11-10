@@ -63,6 +63,19 @@ export interface GameModule<S, A> {
    * leave this unset and are unaffected by every real-time route and socket event.
    */
   realtime?: true
+  /**
+   * Optional headless match runner for games the generic turn-by-turn `simulate()` can't drive
+   * (real-time games: physics plus bots). Used by `npm run simulate`.
+   */
+  simulateHeadless?(opts: { players: number; seed: number }): HeadlessResult
+}
+
+/** One headless match's outcome (see GameModule.simulateHeadless). */
+export interface HeadlessResult {
+  winners: number[]
+  /** Actions/points/plies played, for the speed report. */
+  turns: number
+  stalled: boolean
 }
 
 /** The actor id for actions reported by a real-time game's table (the TV), not a seat. */

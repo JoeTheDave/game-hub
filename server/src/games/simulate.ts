@@ -44,7 +44,8 @@ export function simulate<S, A>(
     if (seat == null) throw new Error('Engine is waiting on no seat but is not finished')
     const legal = game.legalActions(state, seat)
     if (legal.length === 0) throw new Error(`Seat ${seat} has no legal actions`)
-    const agent = agents[seat]
+    // A seat with no agent (e.g. a real-time game's AUTHORITY_SEAT = -1) falls back to random.
+    const agent = agents[seat] ?? (randomAgent as Agent<A>)
     const view = agent.needsView === false ? undefined : game.playerView(state, seat, seats)
     const action = agent(view, legal, agentRng)
     const res = game.applyAction(state, seat, action, rng)

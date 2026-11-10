@@ -2,6 +2,7 @@ import { Server as HttpServer } from 'http'
 import { Server } from 'socket.io'
 import prisma from './prisma.js'
 import { getGame } from '../games/registry.js'
+import { sessionMiddleware } from '../auth/session.js'
 
 let io: Server | null = null
 
@@ -14,19 +15,29 @@ type Ack = (res: { ok: boolean; error?: string }) => void
  * Whether an instance's game is real-time (GameModule.realtime). Looked up once per instance and
  * cached: only real-time instances relay WebRTC signalling and input (rt-signal / rt-input).
  */
-const realtimeCache = new Map<string, boolean>()
-async function isRealtimeInstance(id: string): Promise<boolean> {
+const realtimeCache = new Map<string, { rt: boolean; hostUserId: string | null }>()
+async function realtimeInfo(id: string): Promise<{ rt: boolean; hostUserId: string | null }> {
   const cached = realtimeCache.get(id)
   if (cached !== undefined) return cached
-  let rt = false
+  let info = { rt: false, hostUserId: null as string | null }
   try {
-    const inst = await prisma.gameInstance.findUnique({ where: { id }, select: { game: { select: { slug: true } } } })
-    rt = !!(inst && getGame(inst.game.slug)?.realtime)
+    const inst = await prisma.gameInstance.findUnique({ where: { id }, select: { hostUserId: true, game: { select: { slug: true } } } })
+    info = { rt: !!(inst && getGame(inst.game.slug)?.realtime), hostUserId: inst?.hostUserId ?? null }
   } catch {
     // malformed id etc.
   }
-  realtimeCache.set(id, rt)
-  return rt
+  realtimeCache.set(id, info)
+  return info
+}
+async function isRealtimeInstance(id: string): Promise<boolean> {
+  return (await realtimeInfo(id)).rt
+}
+
+/** The signed-in user id behind a socket (express-session is shared with Socket.IO), if any. */
+function sessionUserId(socket: { request: unknown }): string | null {
+  const req = socket.request as { session?: { passport?: { user?: { id?: unknown } } } }
+  const id = req.session?.passport?.user?.id
+  return typeof id === 'string' ? id : null
 }
 
 /** Seats this socket has proven (via subscribe-seat with the joinToken), as `${id}:${seat}`. */
@@ -45,6 +56,8 @@ export function initSocket(httpServer: HttpServer, clientOrigin: string | true |
     },
     path: '/socket.io',
   })
+  // Share the HTTP session so real-time signalling can tell the host's TV from anyone else.
+  io.engine.use(sessionMiddleware)
   io.on('connection', (socket) => {
     socket.on('subscribe-table', (payload: { id?: string } | undefined, ack?: Ack) => {
       const id = payload?.id
@@ -90,12 +103,22 @@ export function initSocket(httpServer: HttpServer, clientOrigin: string | true |
       'rt-signal',
       async (msg: { id?: unknown; to?: unknown; from?: unknown; payload?: unknown } | undefined) => {
         const id = msg?.id
-        if (typeof id !== 'string' || !(await isRealtimeInstance(id))) return
+        if (typeof id !== 'string') return
+        const info = await realtimeInfo(id)
+        if (!info.rt) return
         if (msg?.to === 'table') {
           const from = msg.from
           if (typeof from !== 'number' || !verifiedSeats(socket).has(`${id}:${from}`)) return
           io?.to(tableRoom(id)).emit('rt-signal', { from, payload: msg.payload })
-        } else if (typeof msg?.to === 'number' && Number.isInteger(msg.to) && socket.rooms.has(tableRoom(id))) {
+        } else if (
+          typeof msg?.to === 'number' &&
+          Number.isInteger(msg.to) &&
+          socket.rooms.has(tableRoom(id)) &&
+          // Only the host's signed-in TV may answer a phone: anyone can watch the table room, but
+          // answering would let them receive that phone's inputs.
+          info.hostUserId != null &&
+          sessionUserId(socket) === info.hostUserId
+        ) {
           io?.to(seatRoom(id, msg.to)).emit('rt-signal', { from: 'table', payload: msg.payload })
         }
       }

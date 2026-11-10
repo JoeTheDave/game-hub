@@ -9,6 +9,7 @@ const GAMES: Record<string, () => Promise<{ default: ClientGameModule }>> = {
   splendor: () => import('./splendor'),
   dragonheart: () => import('./dragonheart'),
   onitama: () => import('./onitama'),
+  klask: () => import('./klask'),
 }
 
 export function hasGame(slug: string): boolean {

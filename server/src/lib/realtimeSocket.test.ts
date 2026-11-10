@@ -21,11 +21,13 @@ let server: http.Server
 let url: string
 let app: ReturnType<typeof createApp>
 let hostId: string
+/** The host's session cookie: the TV is the host's signed-in browser. */
+let hostCookie: string
 const sockets: Socket[] = []
 
-function connect(): Promise<Socket> {
+function connect(cookie?: string): Promise<Socket> {
   return new Promise((resolve) => {
-    const s = ioClient(url, { path: '/socket.io', transports: ['websocket'] })
+    const s = ioClient(url, { path: '/socket.io', transports: ['websocket'], extraHeaders: cookie ? { cookie } : undefined })
     sockets.push(s)
     s.on('connect', () => resolve(s))
   })
@@ -37,7 +39,7 @@ async function table(slug: string) {
   const inst = await createInstanceDirect(slug, hostId)
   const a = (await request(app).post(`/api/games/instances/${inst.id}/join`).send({})).body.player
   const b = (await request(app).post(`/api/games/instances/${inst.id}/join`).send({})).body.player
-  const tv = await connect()
+  const tv = await connect(hostCookie)
   const p0 = await connect()
   const p1 = await connect()
   const stranger = await connect()
@@ -60,6 +62,7 @@ beforeAll(async () => {
   const agent = request.agent(app)
   const reg = await agent.post('/api/auth/register').send({ email: `rts-${Date.now()}@example.com`, password: 'password123', passwordConfirmation: 'password123' })
   hostId = reg.body.id
+  hostCookie = ([] as string[]).concat(reg.headers['set-cookie'] ?? []).map((c) => c.split(';')[0]).join('; ')
 })
 
 afterAll(async () => {
@@ -85,6 +88,16 @@ describe('real-time signalling and input relay', () => {
     expect(t.got.p0.filter((e) => e.event === 'rt-signal').map((e) => e.payload)).toEqual([{ from: 'table', payload: { sdp: 'answer-0' } }])
     expect(t.got.p1.filter((e) => e.event === 'rt-signal')).toHaveLength(0)
     expect(t.got.stranger).toHaveLength(0)
+  })
+
+  it('lets only the host’s signed-in TV answer a phone (a table watcher cannot)', async () => {
+    const t = await table('rt-test')
+    const watcher = await connect()
+    await emitAck(watcher, 'subscribe-table', { id: t.id })
+    watcher.emit('rt-signal', { id: t.id, to: 0, payload: { sdp: 'watcher-answer' } })
+    t.tv.emit('rt-signal', { id: t.id, to: 0, payload: { sdp: 'host-answer' } })
+    await settle()
+    expect(t.got.p0.filter((e) => e.event === 'rt-signal').map((e) => e.payload)).toEqual([{ from: 'table', payload: { sdp: 'host-answer' } }])
   })
 
   it('relays inputs from verified seats to the table only', async () => {
