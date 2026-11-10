@@ -46,3 +46,6 @@ curl -sL -o /tmp/Bungee-Regular.ttf https://github.com/google/fonts/raw/main/ofl
 python3 process_assets.py /tmp/klask-raw /tmp/Bungee-Regular.ttf
 ~/ai/ComfyUI/venv/bin/python make_sounds.py ../../client/src/games/klask/assets/sounds
 ```
+
+## Cover (replaced 2026-11-10)
+`cover.webp` is now Joe's poster (vault `Projects/game-hub/Klask/Poster - Klask.png`, 1024×1536), cropped to 3:4 (y 100–1465) and resized to 800×1067 at q88. The generated cover is retired.
