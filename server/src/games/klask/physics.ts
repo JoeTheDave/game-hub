@@ -14,16 +14,24 @@
 
 export const STEP = 1 / 120
 
-// Piece sizes (mm), roughly the real game's.
-export const BALL_R = 8
-export const STRIKER_R = 16
-export const BISCUIT_R = 7
-export const GOAL_R = 18
+// Piece sizes (mm). About 25% smaller than the first cut (Joe, 2026-11-10: "the game components
+// are too big"), so the board feels roomier. The goal stays comfortably wider than the ball.
+export const BALL_R = 6
+export const STRIKER_R = 12
+export const BISCUIT_R = 5
+export const GOAL_R = 14
 
-const BALL_DRAG = 0.55 // fraction of speed lost per second (felt friction)
-const BALL_MAX = 4200 // mm/s
-const WALL_E = 0.82 // ball restitution with walls
-const HIT_E = 0.9 // ball restitution with strikers
+const BALL_DRAG = 0.8 // fraction of speed lost per second (felt friction)
+// Hits were far too explosive (Joe, 2026-11-10): a soft striker-ball bounce, a cap on how much of
+// the striker's speed reaches the ball, smoothed striker velocity (finger input arrives in
+// jumps, so raw per-step velocity spikes), and a lower top speed.
+const BALL_MAX = 1900 // mm/s
+const WALL_E = 0.7 // ball restitution with walls
+const HIT_E = 0.5 // ball restitution with strikers
+/** At most this much striker speed counts in a hit (mm/s); a flick still moves the striker fast. */
+const HIT_STRIKER_CAP = 1300
+/** Smoothing for the striker velocity used in hits (fraction of the new reading per step). */
+const HIT_VEL_SMOOTH = 0.35
 const STRIKER_MAX = 3200 // mm/s (a fast hand)
 const STRIKER_ACCEL = 90000 // mm/s² (the magnet keeps up with the hand)
 const BISCUIT_DRAG = 3.2
@@ -223,6 +231,9 @@ export interface Striker {
   y: number
   vx: number
   vy: number
+  /** Smoothed velocity used for hits (optional for worlds saved before it existed). */
+  hvx?: number
+  hvy?: number
   /** Biscuit indexes stuck to this striker, with their offset from its centre. */
   attached: { b: number; ox: number; oy: number }[]
 }
@@ -346,6 +357,8 @@ export function step(world: World, inputs: Inputs): { world: World; events: Phys
     s.y = p.y
     s.vx = (s.x - ox) / dt
     s.vy = (s.y - oy) / dt
+    s.hvx = (s.hvx ?? 0) + (s.vx - (s.hvx ?? 0)) * HIT_VEL_SMOOTH
+    s.hvy = (s.hvy ?? 0) + (s.vy - (s.hvy ?? 0)) * HIT_VEL_SMOOTH
     for (const a of s.attached) {
       const b = biscuits[a.b]
       b.x = s.x + a.ox
@@ -378,11 +391,12 @@ export function step(world: World, inputs: Inputs): { world: World; events: Phys
     // 3. Ball vs strikers (kinematic) and their stuck biscuits.
     for (const s of strikers) {
       if (!s) continue
-      const sp = bounceOffMover(ball, s.x, s.y, s.vx, s.vy, BALL_R + STRIKER_R)
+      const hv = hitVelocity(s)
+      const sp = bounceOffMover(ball, s.x, s.y, hv.x, hv.y, BALL_R + STRIKER_R)
       if (sp > 0) events.push({ type: 'hit', seat: s.seat, speed: sp })
       for (const a of s.attached) {
         const b = biscuits[a.b]
-        bounceOffMover(ball, b.x, b.y, s.vx, s.vy, BALL_R + BISCUIT_R)
+        bounceOffMover(ball, b.x, b.y, hv.x, hv.y, BALL_R + BISCUIT_R)
       }
     }
 
@@ -539,6 +553,18 @@ function wall(geo: BoardGeometry, p: { x: number; y: number; vx: number; vy: num
 }
 
 /** Ball off an infinitely heavy moving disc at (x, y) with velocity (vx, vy); returns impact speed. */
+/** The striker velocity a hit uses: smoothed, then capped, so a jittery flick can't launch the ball. */
+export function hitVelocity(s: Pick<Striker, 'vx' | 'vy' | 'hvx' | 'hvy'>): Vec {
+  let x = s.hvx ?? s.vx
+  let y = s.hvy ?? s.vy
+  const v = Math.hypot(x, y)
+  if (v > HIT_STRIKER_CAP) {
+    x *= HIT_STRIKER_CAP / v
+    y *= HIT_STRIKER_CAP / v
+  }
+  return { x, y }
+}
+
 function bounceOffMover(ball: Ball, x: number, y: number, vx: number, vy: number, minDist: number): number {
   const dx = ball.x - x
   const dy = ball.y - y

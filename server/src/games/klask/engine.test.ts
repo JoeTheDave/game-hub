@@ -94,5 +94,5 @@ describe('klask engine', () => {
       expect(r.points).toBeGreaterThanOrEqual(6)
     }
     expect(simulateMatch({ players: n, seed: 3 })).toEqual(simulateMatch({ players: n, seed: 3 }))
-  })
+  }, 30_000) // softer hits make bot rallies longer
 })
