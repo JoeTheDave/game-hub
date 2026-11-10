@@ -144,3 +144,26 @@ These are Joe's standing preferences, learned the hard way on Splendor:
 - **Simulation:** 1,000 random-agent games across player counts. Check the game's invariants after every action (component conservation, capacity limits), deterministic seed replay, and a JSON round-trip.
 - **Client:** pure logic helpers, layout (equal margins, zones fit, no overlaps), flight geometry, and a render test of TV and phones from real game states.
 - **No browser in agent runs.** Joe spot-checks on the real TV and phones, so list exactly what to check in each completion.
+
+## 10. Real-time games (opt-in)
+
+For games played live by several players at once, e.g. Klask. Turn-based games ignore all of this.
+
+- **Opt in:** set `realtime: true` on the `GameModule`. Every real-time route and socket event refuses non-real-time instances, so turn-based games are unaffected.
+- **The TV is the authority.** It runs the physics or simulation locally, from a pure, deterministic, fixed-timestep module in `server/src/games/<slug>/`, imported via `@games`, so it's also headless-testable.
+  - It reports **outcomes only** (a point, a round over) with `postAuthorityAction(id, action)` (`client/src/realtime`), i.e. `POST /games/instances/:id/authority-action`.
+  - That route requires the **host session**: the TV is opened by the logged-in host. The engine receives these actions as `AUTHORITY_SEAT` (−1) and must reject outcome actions from real seats.
+  - History, series, rematch and admin then work exactly as for turn-based games.
+- **Inputs never touch the database.**
+  - Phones send to the TV over a **WebRTC data channel, peer-to-peer on the LAN**: unordered, `maxRetransmits: 0`.
+  - Signalling rides the platform socket (`rt-signal`).
+  - The channel falls back automatically to the server **relay** (`rt-input`, volatile) after 3 s or on failure, and inputs use the relay while connecting, so play never waits.
+  - Hooks: `useRealtimeHost(instanceId)` on the TV (`inputs` ref, per-seat `status` {mode, rttMs}, `send(seat, data)` for feedback/haptics), and `useRealtimeController(instanceId, seat, onFeedback?)` on the phone (`send(x, y)`, `status`).
+- **Send positions, not deltas.** Each input carries the striker's target position in table coordinates plus a sequence number. A lost or late packet is harmless, and the TV keeps only the newest.
+- **No artificial lag.** Pieces follow the target as fast as the physics allows. Minimise latency everywhere: send on every pointer move and render every frame. Tell players to turn on their TV's Game Mode.
+- **Eyes-up input:** players look at the TV, not the phone.
+  - The phone is a full-screen **relative trackpad**: finger movement moves the piece, and lifting the finger never jumps it.
+  - Sensitivity is adjustable and stored on the phone, with a small boost for fast flicks.
+  - The screen has minimal visuals, no scroll, zoom or back-swipe, both orientations, and the wake lock held.
+  - Haptics where supported. iOS web has none, so feedback comes from the TV (sound and visuals).
+- **Latency readout:** the TV shows each player's path (P2P / relay / connecting) and RTT from the ping/pong over that path.

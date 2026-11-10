@@ -3,6 +3,7 @@ import ticTacToe from './tic-tac-toe/index.js'
 import splendor from './splendor/index.js'
 import dragonheart from './dragonheart/index.js'
 import onitama from './onitama/index.js'
+import klask from './klask/index.js'
 
 /**
  * Every playable game. Adding a game = one line here (plus its client registry entry).
@@ -14,6 +15,7 @@ export const GAMES: Record<string, GameModule<any, any>> = {
   [splendor.slug]: splendor,
   [dragonheart.slug]: dragonheart,
   [onitama.slug]: onitama,
+  [klask.slug]: klask,
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

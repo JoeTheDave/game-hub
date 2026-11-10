@@ -1,0 +1,5 @@
+[
+  {"name": "cover-c", "prompt": "energetic overhead three-quarter photograph of a small wooden magnetic tabletop game, glossy dark navy blue board with white painted circles and lines, a bright yellow ball flying with motion blur, small white round magnetic biscuits, black strikers, four hands gripping the edges, warm golden light, colorful bokeh party lights background, vibrant saturated, dramatic, top area of image is darker for a title", "width": 896, "height": 1184, "seed": 515, "steps": 24},
+  {"name": "playfield", "prompt": "extreme macro close-up filling the entire frame edge to edge, flat surface of dark navy blue matte painted wood board, subtle fine grain and tiny paint speckles, completely uniform, no edges, no background, no objects, no lines, no text, seamless texture", "width": 1024, "height": 1024, "seed": 616, "steps": 22},
+  {"name": "wood", "prompt": "extreme close-up flat top-down seamless texture filling the frame, warm golden oak wood grain with natural darker figure lines, smooth satin varnish, even lighting, no edges, no objects, no text", "width": 1024, "height": 1024, "seed": 717, "steps": 22}
+]

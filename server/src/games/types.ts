@@ -56,7 +56,17 @@ export interface GameModule<S, A> {
    * and cumulative totals. Null while the game is unfinished.
    */
   summary?(state: S): GameSummary | null
+  /**
+   * Opt-in real-time play (e.g. Klask). The TV runs the live simulation from phone inputs
+   * (WebRTC data channels, socket relay fallback) and is the authority for outcomes: it reports
+   * them via POST /authority-action, applied with `playerOrder = AUTHORITY_SEAT`. Turn-based games
+   * leave this unset and are unaffected by every real-time route and socket event.
+   */
+  realtime?: true
 }
+
+/** The actor id for actions reported by a real-time game's table (the TV), not a seat. */
+export const AUTHORITY_SEAT = -1
 
 /** A lobby setting a game offers. Only boolean (checkbox) options for now. */
 export interface GameOption {

@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import prisma from '../lib/prisma.js'
 import { generateJoinCode } from '../lib/joinCode.js'
 import { getGame } from '../games/registry.js'
+import { AUTHORITY_SEAT } from '../games/types.js'
 import {
   broadcastInstance,
   historyAfter,
@@ -355,6 +356,43 @@ router.post('/games/instances/:id/admin', async (req: Request, res: Response) =>
   }
 })
 
+type LoadedInst = NonNullable<Awaited<ReturnType<typeof loadInstance>>>
+
+/**
+ * Apply one action through the game's engine and persist it with a versioned write (shared by
+ * seat actions and, for real-time games, the TV's authority actions). Preserves options, admin
+ * and history, and records the game's result in the match history on its finishing action.
+ */
+async function applyAndWrite(
+  instance: LoadedInst,
+  actor: number,
+  action: unknown,
+  version: unknown
+): Promise<
+  | { ok: true; updated: LoadedInst }
+  | { ok: false; status: number; error: string; conflict?: boolean }
+> {
+  const mod = moduleFor(instance)
+  if (!mod) return { ok: false, status: 400, error: 'Unknown game type' }
+  const stored = storedState(instance)
+  const { phase, state, history } = stored
+  if (phase !== 'playing' || state === undefined) return { ok: false, status: 400, error: 'Game is not in progress' }
+  if (typeof version === 'number' && version !== instance.version) {
+    return { ok: false, status: 409, error: 'The game changed — try again', conflict: true }
+  }
+  const result = mod.applyAction(state, actor, action, serverRng)
+  if (!result.ok) return { ok: false, status: 400, error: result.error }
+  const nextPhase = mod.isFinished(result.state) ? 'finished' : 'playing'
+  // The finishing action records this game's result in the instance's match history (once).
+  const nextHistory = historyAfter(mod, phase, nextPhase, result.state, history ?? [])
+  if (!(await versionedWrite(instance.id, instance.version, { ...stored, phase: nextPhase, state: result.state, history: nextHistory }))) {
+    return { ok: false, status: 409, error: 'The game changed — try again', conflict: true }
+  }
+  const updated = (await loadInstance(instance.id))!
+  broadcastInstance(updated, result.events)
+  return { ok: true, updated }
+}
+
 // One action from a seat. Authenticated by joinToken; applied by the game's engine.
 router.post('/games/instances/:id/action', async (req: Request, res: Response) => {
   try {
@@ -369,32 +407,43 @@ router.post('/games/instances/:id/action', async (req: Request, res: Response) =
     if (!instance) return res.status(404).json({ error: 'Game not found' })
     if (!seatTokenValid(instance, playerOrder, joinToken)) return res.status(403).json({ error: 'Invalid seat' })
     const seat = playerOrder as number
-    const mod = moduleFor(instance)
-    if (!mod) return res.status(400).json({ error: 'Unknown game type' })
-    const stored = storedState(instance)
-    const { phase, state, history } = stored
-    if (phase !== 'playing' || state === undefined) return res.status(400).json({ error: 'Game is not in progress' })
-    if (typeof version === 'number' && version !== instance.version) {
-      return res.status(409).json({ error: 'The game changed — try again', playerView: playerViewFor(instance, seat), version: instance.version })
+    const out = await applyAndWrite(instance, seat, action, version)
+    if (!out.ok) {
+      if (out.conflict) {
+        const fresh = await loadInstance(id)
+        return res.status(409).json({ error: out.error, playerView: fresh ? playerViewFor(fresh, seat) : null, version: fresh?.version })
+      }
+      return res.status(out.status).json({ error: out.error })
     }
-    const result = mod.applyAction(state, seat, action, serverRng)
-    if (!result.ok) return res.status(400).json({ error: result.error })
-    const nextPhase = mod.isFinished(result.state) ? 'finished' : 'playing'
-    // The finishing move records this game's result in the instance's match history (once).
-    const nextHistory = historyAfter(mod, phase, nextPhase, result.state, history ?? [])
-    if (!(await versionedWrite(id, instance.version, { ...stored, phase: nextPhase, state: result.state, history: nextHistory }))) {
-      const fresh = await loadInstance(id)
-      return res.status(409).json({
-        error: 'The game changed — try again',
-        playerView: fresh ? playerViewFor(fresh, seat) : null,
-        version: fresh?.version,
-      })
-    }
-    const updated = (await loadInstance(id))!
-    broadcastInstance(updated, result.events)
-    res.json({ playerView: playerViewFor(updated, seat), version: updated.version })
+    res.json({ playerView: playerViewFor(out.updated, seat), version: out.updated.version })
   } catch (error) {
     console.error('Action error:', error)
+    res.status(500).json({ error: 'Failed to apply action' })
+  }
+})
+
+/**
+ * Real-time games only: the TV (opened by the logged-in host) runs the simulation and is the
+ * authority for outcomes (e.g. a point scored). Its actions are applied as AUTHORITY_SEAT. Seats
+ * can never send these, and turn-based games refuse this route.
+ */
+router.post('/games/instances/:id/authority-action', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { action, version } = req.body as { action?: unknown; version?: number }
+    const instance = await loadInstance(id)
+    if (!instance) return res.status(404).json({ error: 'Game not found' })
+    const mod = moduleFor(instance)
+    if (!mod?.realtime) return res.status(400).json({ error: 'Not a real-time game' })
+    if (sessionUserId(req) !== instance.hostUserId) return res.status(403).json({ error: 'Only the host table can report results' })
+    const out = await applyAndWrite(instance, AUTHORITY_SEAT, action, version)
+    if (!out.ok) {
+      const fresh = out.conflict ? await loadInstance(id) : null
+      return res.status(out.status).json({ error: out.error, ...(fresh ? { version: fresh.version } : {}) })
+    }
+    res.json(lobbySafe(out.updated))
+  } catch (error) {
+    console.error('Authority action error:', error)
     res.status(500).json({ error: 'Failed to apply action' })
   }
 })
