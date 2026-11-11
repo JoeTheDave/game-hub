@@ -13,6 +13,38 @@ export interface View {
 /** Wooden frame width (mm) around the playfield. */
 export const FRAME_MM = 26
 
+/** Breathing room around the table, as a fraction of the screen's short side (the board fills the rest). */
+export const BOARD_MARGIN_FRAC = 0.015
+
+/** The board as large as the screen allows: a round table fills almost the full height. */
+export function boardView(geo: BoardGeometry, w: number, h: number): View {
+  return fitView(geo, w, h, Math.min(w, h) * BOARD_MARGIN_FRAC)
+}
+
+/**
+ * Where a player's tag goes. Scores live in the free space beside the board (16:9 leaves wide
+ * side gutters), on the side of that player's zone and at its height. If the gutters are too
+ * narrow (squarer screens), the tag sits on the board just inside the rim of the player's zone.
+ */
+export function hudAnchor(geo: BoardGeometry, seat: number, v: View, w: number, h: number, minGutter = 170): { x: number; y: number; inside: boolean } {
+  const hw = (geo.halfW + FRAME_MM) * v.scale
+  const hh = (geo.halfH + FRAME_MM) * v.scale
+  const gutter = v.cx - hw
+  const a = geo.zoneAngles[seat]
+  let cos = Math.cos(a)
+  const sin = Math.sin(a)
+  if (Math.abs(cos) < 0.2) cos = sin < 0 ? -1 : 1 // bottom zone → left gutter, top zone → right gutter
+  if (gutter >= minGutter) {
+    const x = cos < 0 ? gutter / 2 : w - gutter / 2
+    const y = Math.min(h - 70, Math.max(70, v.cy - sin * hh * 0.7))
+    return { x, y, inside: false }
+  }
+  const r = geo.shape === 'circle' ? geo.radius * 0.78 : geo.halfW * 0.78
+  const along = geo.shape === 'circle' ? { x: Math.cos(a) * r, y: Math.sin(a) * r } : { x: Math.sign(Math.cos(a)) * r, y: geo.halfH * 0.72 }
+  const p = toPx(v, along.x, along.y)
+  return { x: p.x, y: p.y, inside: true }
+}
+
 /** Fit the whole table (playfield + frame) into a w×h canvas, leaving `margin` px for the HUD. */
 export function fitView(geo: BoardGeometry, w: number, h: number, margin = 0): View {
   const hw = geo.halfW + FRAME_MM

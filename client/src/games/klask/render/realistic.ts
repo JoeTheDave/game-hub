@@ -1,6 +1,6 @@
 import { BALL_R, BISCUIT_R, STRIKER_R, type BoardGeometry, type World } from '@games/klask/physics'
 import { TEXTURES } from '../assets'
-import { FRAME_MM, dividerSegments, fitView, playfieldPath, toPx, type Ctx, type DrawInfo, type Renderer } from './common'
+import { FRAME_MM, boardView, dividerSegments, playfieldPath, toPx, type Ctx, type DrawInfo, type Renderer } from './common'
 
 /**
  * The real table: a wooden frame, a dark blue painted playfield with white lines, goal holes
@@ -11,7 +11,7 @@ export function createRealisticRenderer(): Renderer {
   return {
     burst() {},
     draw(ctx: Ctx, w: number, h: number, world: World, geo: BoardGeometry, info: DrawInfo) {
-      const v = fitView(geo, w, h, Math.min(w, h) * 0.09)
+      const v = boardView(geo, w, h)
       const px = (mm: number) => mm * v.scale
 
       // Room: warm, dim background so the table pops.

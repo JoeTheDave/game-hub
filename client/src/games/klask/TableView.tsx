@@ -3,15 +3,12 @@ import type { TableViewProps } from '../types'
 import { boardGeometry } from '@games/klask/physics'
 import type { KlaskTableView } from '@games/klask/engine'
 import { useRealtimeHost, postAuthorityAction } from '../../realtime'
-import { createRenderer, fitView, toPx } from './render'
+import { boardView, createRenderer, hudAnchor } from './render'
 import { TableDirector, type Target } from './director'
 import { bannerText, seatHex, seriesSummary, standingsRows } from './logic'
-import { FRAME_MM } from './render/common'
 import { LivesPips, SeriesTable, Standings } from './components'
 import { preloadImages } from './assets'
 import './klask.css'
-
-const HUD_MARGIN = 0.09
 
 /**
  * The TV: runs the live physics from every phone's latest target (WebRTC, relay fallback) and
@@ -121,27 +118,35 @@ export function TableView({ instance, view, seq, onEventsDone, sound }: TableVie
     return () => cancelAnimationFrame(raf)
   }, [host.inputs])
 
-  // HUD anchors: each player's tag sits just outside the rim, in their zone's direction.
-  const v = fitView(geo, size.w, size.h, Math.min(size.w, size.h) * HUD_MARGIN)
-  const hud = view.players.map((p) => {
-    const a = geo.zoneAngles[p.seat]
-    const r = geo.shape === 'circle' ? geo.radius + FRAME_MM + 34 : geo.halfW + FRAME_MM + 70
-    const pt = toPx(v, Math.cos(a) * r, Math.sin(a) * r)
-    return { p, x: Math.min(size.w - 120, Math.max(120, pt.x)), y: Math.min(size.h - 60, Math.max(60, pt.y)) }
-  })
+  // The board fills the screen; each player's tag sits in the free space beside it, on their side.
+  const v = boardView(geo, size.w, size.h)
+  const hud = view.players.map((p) => ({ p, ...hudAnchor(geo, p.seat, v, size.w, size.h) }))
   const series = seriesSummary(instance.history, view.players)
 
   return (
     <div ref={wrapRef} className="kl-text" style={{ position: 'absolute', inset: 0, background: view.stylized ? '#05050b' : '#140e0a', overflow: 'hidden', color: '#fff' }}>
       <canvas ref={canvasRef} data-klask-canvas="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
 
-      {hud.map(({ p, x, y }) => {
+      {hud.map(({ p, x, y, inside }) => {
         const st = host.status[p.seat]
         return (
           <div
             key={p.seat}
             data-hud={p.seat}
-            style={{ position: 'absolute', left: x, top: y, transform: 'translate(-50%, -50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, opacity: p.alive ? 1 : 0.45, pointerEvents: 'none' }}
+            style={{
+              position: 'absolute',
+              left: x,
+              top: y,
+              transform: 'translate(-50%, -50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+              opacity: p.alive ? 1 : 0.45,
+              pointerEvents: 'none',
+              // On the board (narrow screens only), a soft backing keeps the tag readable.
+              ...(inside ? { background: 'rgba(0,0,0,.35)', padding: '6px 12px', borderRadius: 12 } : {}),
+            }}
           >
             <span style={{ fontWeight: 800, fontSize: 24, color: colors[p.seat], textShadow: '0 2px 6px rgba(0,0,0,.6)' }}>{p.name}</span>
             {view.playerCount === 2 ? (

@@ -1,5 +1,5 @@
 import { BALL_R, BISCUIT_R, STRIKER_R, type BoardGeometry, type World } from '@games/klask/physics'
-import { dividerSegments, fitView, playfieldPath, toPx, type Ctx, type DrawInfo, type Renderer } from './common'
+import { boardView, dividerSegments, playfieldPath, toPx, type Ctx, type DrawInfo, type Renderer } from './common'
 
 interface Particle {
   x: number
@@ -34,7 +34,7 @@ export function createStylizedRenderer(): Renderer {
       }
     },
     draw(ctx: Ctx, w: number, h: number, world: World, geo: BoardGeometry, info: DrawInfo) {
-      const v = fitView(geo, w, h, Math.min(w, h) * 0.09)
+      const v = boardView(geo, w, h)
       const px = (mm: number) => mm * v.scale
       ctx.fillStyle = '#05050b'
       ctx.fillRect(0, 0, w, h)

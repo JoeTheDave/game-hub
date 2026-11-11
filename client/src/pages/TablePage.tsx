@@ -42,8 +42,14 @@ export function TablePage() {
 
   const { TableView } = mod
   return (
-    // Any tap on the table unlocks audio (browsers require a gesture).
-    <div className={shell} onClickCapture={() => void soundBoard.unlock()}>
+    // Any tap on the table unlocks audio and goes full screen (browsers require a gesture for both).
+    <div
+      className={shell}
+      onClickCapture={() => {
+        void soundBoard.unlock()
+        enterFullscreen()
+      }}
+    >
       <div className="absolute inset-0 overflow-hidden">
         <TableView
           instance={current.instance}
@@ -65,7 +71,18 @@ export function TablePage() {
         >
           {muted ? '🔇' : '🔊'}
         </button>
-        <Link to="/" className="h-9 px-3 rounded-full bg-black/50 text-white text-sm flex items-center hover:bg-black/70">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleFullscreen()
+          }}
+          className="h-9 px-3 rounded-full bg-black/50 text-white text-sm cursor-pointer hover:bg-black/70"
+          title="Full screen"
+        >
+          ⛶
+        </button>
+        <Link to="/" onClick={() => exitFullscreen()} className="h-9 px-3 rounded-full bg-black/50 text-white text-sm flex items-center hover:bg-black/70">
           Exit
         </Link>
       </div>
@@ -81,4 +98,17 @@ export function TablePage() {
       )}
     </div>
   )
+}
+
+/** The TV table goes full screen on the first tap (and the ⛶ button toggles it). No-ops where unsupported. */
+function enterFullscreen() {
+  if (typeof document === 'undefined' || document.fullscreenElement) return
+  void document.documentElement.requestFullscreen?.().catch(() => {})
+}
+function exitFullscreen() {
+  if (typeof document !== 'undefined' && document.fullscreenElement) void document.exitFullscreen?.().catch(() => {})
+}
+function toggleFullscreen() {
+  if (typeof document !== 'undefined' && document.fullscreenElement) exitFullscreen()
+  else enterFullscreen()
 }
