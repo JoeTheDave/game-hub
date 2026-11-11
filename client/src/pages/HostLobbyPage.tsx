@@ -6,12 +6,14 @@ import { soundBoard } from '../lib/soundBoard'
 import { COLOR_BG_CLASSES } from '../lib/playerColors'
 import { useTableFeed } from '../hooks/useTableFeed'
 import { GameOptions } from '../components/GameOptions'
+import { useAutoReloadOnDeploy } from '../hooks/useAutoReloadOnDeploy'
 
 /** The host's lobby screen (usually the TV): QR code to join, roster, and Start. Game-agnostic. */
 export function HostLobbyPage() {
   const { gameSlug, id } = useParams<{ gameSlug: string; id: string }>()
   const navigate = useNavigate()
   const { latest: instance, error: feedError, loading } = useTableFeed(id ?? null)
+  useAutoReloadOnDeploy()
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)

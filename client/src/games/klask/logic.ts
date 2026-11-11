@@ -22,11 +22,12 @@ export function seatHex(color: string | null | undefined, seat: number): string 
  */
 export type Mapping = 'tv' | 'side'
 
-export const SENSITIVITY = { min: 0.5, max: 2.5, default: 1.1 } // table mm per CSS px
+// Calmer default (Joe, 2026-11-10: strikers far too fast): 0.6 mm per CSS px.
+export const SENSITIVITY = { min: 0.3, max: 1.5, default: 0.6, step: 0.05 } // table mm per CSS px
 /** Fast flicks travel further: gain grows past this finger speed (px/ms), capped. */
 const ACCEL_FROM = 0.6
 const ACCEL_PER = 0.9
-const ACCEL_MAX = 2.2
+const ACCEL_MAX = 1.5
 
 /** Turn a finger movement on the phone (screen px, y down) into a table-space delta (mm, y up). */
 export function deltaToTable(dxPx: number, dyPx: number, seat: number, geo: BoardGeometry, mapping: Mapping): Vec {
@@ -146,4 +147,19 @@ export function standingsRows(
     }))
     .sort((a, b) => Number(b.winner) - Number(a.winner) || b.sort - a.sort)
     .map(({ sort: _sort, ...r }) => r)
+}
+
+/**
+ * A phone's answer to the table's "center" message. A new epoch (a reset or rematch) moves the
+ * target back to the player's home spot and adopts the epoch. A repeat of the current epoch
+ * (the table hasn't heard from us yet, e.g. a lost packet) keeps the target where it is, so a
+ * mid-play nudge never yanks the striker home.
+ */
+export function recenter(
+  state: { epoch: number; target: { x: number; y: number } },
+  incoming: number | undefined,
+  home: { x: number; y: number }
+): { epoch: number; target: { x: number; y: number } } {
+  if (incoming === undefined || incoming !== state.epoch) return { epoch: incoming ?? state.epoch, target: { ...home } }
+  return { epoch: state.epoch, target: state.target }
 }

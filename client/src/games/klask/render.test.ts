@@ -107,7 +107,9 @@ describe('TV director: a point is reported once, then the next play starts', () 
     t.d.tick(1 / 60, {}, 2600)
     expect(t.d.pending).toBeNull()
     expect(t.d.world.phase).toBe('play')
-    expect(t.sent.filter((s) => (s.data as { re?: string }).re === 'center').map((s) => s.seat).sort()).toEqual([0, 1])
+    // every live seat is told to re-centre for the new epoch
+    const fresh = t.sent.filter((s) => (s.data as { re?: string; epoch?: number }).re === 'center' && (s.data as { epoch?: number }).epoch === t.d.epoch)
+    expect([...new Set(fresh.map((s) => s.seat))].sort()).toEqual([0, 1])
   })
 
   it('tells the TV to open from the host’s browser when the server refuses (403)', async () => {
@@ -121,8 +123,39 @@ describe('TV director: a point is reported once, then the next play starts', () 
 
   it('clamps phone targets into the right zone (a phone can’t reach across)', () => {
     const t = setup()
-    for (let i = 0; i < 120; i++) t.d.tick(1 / 60, { 0: { x: 180, y: 0 } }, i * 16)
+    for (let i = 0; i < 120; i++) t.d.tick(1 / 60, { 0: { x: 180, y: 0, epoch: t.d.epoch } }, i * 16)
     expect(t.d.world.strikers[0]!.x).toBeLessThan(0)
+  })
+
+  it('after a reset, a stale target (from before) is ignored: the striker holds home, and center is re-sent', async () => {
+    const t = setup()
+    const home = t.d.geo.homeSpots[1]
+    const ownGoal = t.d.geo.goals[1]
+    const before = t.d.epoch
+    // seat 1's last target sits over its own goal (where the loop came from)
+    const stale = { 1: { x: ownGoal.x, y: ownGoal.y, epoch: before } }
+    const goal = t.d.geo.goals[0]
+    t.d.world = { ...t.d.world, ball: { x: goal.x, y: goal.y, vx: 0, vy: 0 } }
+    t.d.tick(1 / 60, stale, 1000)
+    await Promise.resolve()
+    const res = klaskModule.applyAction(t.state as KlaskState, AUTHORITY_SEAT, { type: 'point', against: 0, reason: 'goal' }, seededRng(1))
+    if (!res.ok) throw new Error(res.error)
+    t.d.setView(klaskModule.tableView(res.state, t.seats) as KlaskTableView, 1100)
+    t.d.tick(1 / 60, stale, 2600) // the reset happens here: a new epoch
+    expect(t.d.epoch).toBe(before + 1)
+    const centers = () => t.sent.filter((m) => (m.data as { re?: string }).re === 'center' && m.seat === 1)
+    expect(centers().at(-1)!.data).toEqual({ re: 'center', epoch: before + 1 })
+    // the stale target keeps arriving for 3 s: the striker stays home and never falls in
+    for (let i = 0; i < 180; i++) t.d.tick(1 / 60, stale, 2600 + i * 16)
+    const s1 = t.d.world.strikers[1]!
+    expect(Math.hypot(s1.x - home.x, s1.y - home.y)).toBeLessThan(0.5)
+    expect(t.posted).toHaveLength(1) // no Klask conceded by seat 1
+    // the phone hasn't caught up, so center is re-sent, but throttled
+    expect(centers().length).toBeGreaterThan(2)
+    expect(centers().length).toBeLessThan(12)
+    // once the phone answers for the new epoch, its target counts again
+    for (let i = 0; i < 60; i++) t.d.tick(1 / 60, { 1: { x: home.x + 40, y: home.y, epoch: t.d.epoch } }, 6000 + i * 16)
+    expect(t.d.world.strikers[1]!.x).toBeGreaterThan(home.x + 30)
   })
 
   it('a rematch (finished → fresh) rebuilds the world', () => {
@@ -130,8 +163,16 @@ describe('TV director: a point is reported once, then the next play starts', () 
     const fin = { ...t.table, finished: true, result: { winners: [1] } }
     t.d.setView(fin, 0)
     t.d.world = { ...t.d.world, tick: 999 }
+    const before = t.d.epoch
     t.d.setView({ ...t.table, round: 0, finished: false }, 10)
+    // createWorld starts at tick 0 and resets once, so the world is brand new
     expect(t.d.world.tick).toBe(0)
+    // and the rematch is a new input epoch: the previous game's targets no longer count
+    expect(t.d.epoch).toBe(before + 1)
+    const home = t.d.geo.homeSpots[0]
+    for (let i = 0; i < 60; i++) t.d.tick(1 / 60, { 0: { x: t.d.geo.goals[0].x, y: t.d.geo.goals[0].y, epoch: before } }, 100 + i * 16)
+    const s0 = t.d.world.strikers[0]!
+    expect(Math.hypot(s0.x - home.x, s0.y - home.y)).toBeLessThan(0.5)
   })
 })
 

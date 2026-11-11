@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  define: { __BUILD_ID__: JSON.stringify('test') },
   resolve: {
     // Same alias the client uses for pure game modules (client tests import them).
     alias: { '@games': fileURLToPath(new URL('./server/src/games', import.meta.url)) },

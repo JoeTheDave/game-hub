@@ -153,11 +153,16 @@ describe('klask physics', () => {
     expect(step(w, {}).events.filter((e) => e.type === 'point')).toHaveLength(0)
   })
 
-  it('a striker driven over its own hole is a Klask', () => {
+  it('a striker driven over its own hole is a Klask, but never during the post-reset grace window', () => {
     const g = boardGeometry(3)
     const w = createWorld(3, undefined, 1)
-    const { events } = run(w, 60, () => ({ 0: { x: g.goals[0].x, y: g.goals[0].y } }))
-    expect(events).toContainEqual({ type: 'point', against: 0, reason: 'klask' })
+    const over = () => ({ 0: { x: g.goals[0].x, y: g.goals[0].y } })
+    // a stale target drags the striker over its goal right after a reset: no point yet
+    const early = run(w, MAGNET_GRACE_STEPS - 1, over)
+    expect(early.events.some((e) => e.type === 'point')).toBe(false)
+    // still held there once the grace window ends: now it's a Klask
+    const later = run(early.w, 10, over)
+    expect(later.events).toContainEqual({ type: 'point', against: 0, reason: 'klask' })
   })
 
   it('two biscuits stuck to a striker concede a point; magnets wait out the grace period', () => {

@@ -2,8 +2,11 @@
  * Real-time wire protocol (phone ⇄ TV), shared by the WebRTC data channel and the socket relay
  * fallback. Messages are tiny JSON arrays:
  *
- *   ['i', x, y, seq]   input: the phone's TARGET position in table coordinates (send positions,
- *                      never deltas, so a lost packet is harmless — the next one supersedes it)
+ *   ['i', x, y, seq, epoch?]
+ *                      input: the phone's TARGET position in table coordinates (send positions,
+ *                      never deltas, so a lost packet is harmless — the next one supersedes it).
+ *                      `epoch` (optional, default 0) is the game's input epoch: the table bumps it on
+ *                      every reset/rematch and ignores inputs from older epochs.
  *   ['p', n]           ping (TV → phone)
  *   ['o', n]           pong (phone → TV), echoing n
  *   ['f', data]        feedback (TV → phone), e.g. { kind: 'hit' } for haptics
@@ -17,10 +20,12 @@ export interface RtInput {
   x: number
   y: number
   seq: number
+  /** The table's input epoch this target was made for (0 when the sender didn't say). */
+  epoch: number
 }
 
 export type RtMessage =
-  | { t: 'input'; x: number; y: number; seq: number }
+  | { t: 'input'; x: number; y: number; seq: number; epoch?: number }
   | { t: 'ping'; n: number }
   | { t: 'pong'; n: number }
   | { t: 'feedback'; data: unknown }
@@ -30,7 +35,7 @@ const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFi
 export function encode(m: RtMessage): string {
   switch (m.t) {
     case 'input':
-      return JSON.stringify(['i', round(m.x), round(m.y), m.seq])
+      return JSON.stringify(m.epoch ? ['i', round(m.x), round(m.y), m.seq, m.epoch] : ['i', round(m.x), round(m.y), m.seq])
     case 'ping':
       return JSON.stringify(['p', m.n])
     case 'pong':
@@ -58,7 +63,8 @@ export function decode(raw: unknown): RtMessage | null {
   if (!Array.isArray(a) || typeof a[0] !== 'string') return null
   switch (a[0]) {
     case 'i':
-      return finite(a[1]) && finite(a[2]) && finite(a[3]) ? { t: 'input', x: a[1], y: a[2], seq: a[3] } : null
+      if (!(finite(a[1]) && finite(a[2]) && finite(a[3]))) return null
+      return { t: 'input', x: a[1], y: a[2], seq: a[3], epoch: finite(a[4]) ? a[4] : 0 }
     case 'p':
       return finite(a[1]) ? { t: 'ping', n: a[1] } : null
     case 'o':
@@ -86,9 +92,14 @@ export function chooseTransport(s: { channelOpen: boolean; failed: boolean; elap
   return 'connecting'
 }
 
-/** Accept an input only if it's newer than the last one applied (data channels are unordered). */
+/**
+ * Accept an input only if it's newer than the last one applied (data channels are unordered): a
+ * later epoch always wins, an older epoch never does, and within an epoch the higher seq wins.
+ */
 export function isNewer(prev: RtInput | null | undefined, next: RtInput): boolean {
-  return !prev || next.seq > prev.seq
+  if (!prev) return true
+  if (next.epoch !== prev.epoch) return next.epoch > prev.epoch
+  return next.seq > prev.seq
 }
 
 /** Round-trip tracking for pings: smoothed RTT in ms. */

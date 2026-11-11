@@ -4,6 +4,7 @@ import { useTableFeed } from '../hooks/useTableFeed'
 import { useGameModule } from '../hooks/useGameModule'
 import { useSoundBoard } from '../hooks/useSoundBoard'
 import { useWakeLock } from '../hooks/useWakeLock'
+import { useAutoReloadOnDeploy } from '../hooks/useAutoReloadOnDeploy'
 
 /**
  * The shared table screen (TV). Full-screen; the game's TableView owns everything inside.
@@ -13,6 +14,7 @@ export function TablePage() {
   const { gameSlug, id } = useParams<{ gameSlug: string; id: string }>()
   const navigate = useNavigate()
   const { current, done, error, loading } = useTableFeed(id ?? null)
+  useAutoReloadOnDeploy()
   const mod = useGameModule(gameSlug)
   const { soundBoard, muted, unlocked, toggleMute } = useSoundBoard()
   // The TV table keeps the computer awake while it's open and visible.

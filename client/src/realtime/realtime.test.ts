@@ -11,11 +11,15 @@ describe('real-time protocol', () => {
       { t: 'feedback', data: { kind: 'hit' } },
     ] as const) {
       const back = decode(encode(m))
-      if (m.t === 'input') expect(back).toEqual({ t: 'input', x: 0.1235, y: -3, seq: 7 })
+      if (m.t === 'input') expect(back).toEqual({ t: 'input', x: 0.1235, y: -3, seq: 7, epoch: 0 })
       else expect(back).toEqual(m)
       expect(decode(toWire(m))).toEqual(back) // the relay carries the array form
     }
     expect(encode({ t: 'input', x: 1, y: 2, seq: 9 })).toBe('["i",1,2,9]')
+    // the input epoch rides along when set, and older 4-element inputs still decode (epoch 0)
+    expect(encode({ t: 'input', x: 1, y: 2, seq: 9, epoch: 3 })).toBe('["i",1,2,9,3]')
+    expect(decode('["i",1,2,9,3]')).toEqual({ t: 'input', x: 1, y: 2, seq: 9, epoch: 3 })
+    expect(decode(['i', 1, 2, 9])).toEqual({ t: 'input', x: 1, y: 2, seq: 9, epoch: 0 })
   })
 
   it('rejects malformed messages', () => {
@@ -32,8 +36,11 @@ describe('real-time protocol', () => {
   })
 
   it('keeps only newer inputs and smooths RTT', () => {
-    expect(isNewer(null, { x: 0, y: 0, seq: 1 })).toBe(true)
-    expect(isNewer({ x: 0, y: 0, seq: 5 }, { x: 1, y: 1, seq: 4 })).toBe(false)
+    expect(isNewer(null, { x: 0, y: 0, seq: 1, epoch: 0 })).toBe(true)
+    expect(isNewer({ x: 0, y: 0, seq: 5, epoch: 0 }, { x: 1, y: 1, seq: 4, epoch: 0 })).toBe(false)
+    // a later epoch wins even with a lower seq (a reconnected phone restarts seq); an older never does
+    expect(isNewer({ x: 0, y: 0, seq: 50, epoch: 1 }, { x: 1, y: 1, seq: 2, epoch: 2 })).toBe(true)
+    expect(isNewer({ x: 0, y: 0, seq: 2, epoch: 2 }, { x: 1, y: 1, seq: 99, epoch: 1 })).toBe(false)
     const r = new RttTracker()
     const a = r.ping(0)
     expect(r.pong(a, 40)).toBe(40)
@@ -143,6 +150,8 @@ describe('ControllerSession (phone)', () => {
 
     c.send(0.5, 0.25) // still connecting → relay
     expect(s.sent.at(-1)).toEqual({ event: 'volatile:rt-input', payload: { id: 'inst', from: 1, input: ['i', 0.5, 0.25, 1] } })
+    c.send(0.5, 0.25, 4) // tagged with the table's input epoch
+    expect(s.sent.at(-1)).toEqual({ event: 'volatile:rt-input', payload: { id: 'inst', from: 1, input: ['i', 0.5, 0.25, 2, 4] } })
 
     // the TV's answer and ICE arrive via signalling
     await s.deliver('rt-signal', { from: 'table', payload: { type: 'answer', sdp: 'ANSWER' } })
@@ -153,7 +162,7 @@ describe('ControllerSession (phone)', () => {
     peers[0].channel!.open()
     expect(c.status.mode).toBe('p2p')
     c.send(0.6, 0.3)
-    expect(peers[0].channel!.sent).toEqual(['["i",0.6,0.3,2]'])
+    expect(peers[0].channel!.sent).toEqual(['["i",0.6,0.3,3]'])
 
     // pings over the channel are answered over the channel; feedback is surfaced
     peers[0].channel!.onmessage!({ data: '["p",4]' })
@@ -204,7 +213,7 @@ describe('HostSession (TV)', () => {
 
     // relay input before the channel opens
     await s.deliver('rt-input', { from: 2, input: ['i', 0.1, 0.2, 1] })
-    expect(h.inputs[2]).toEqual({ x: 0.1, y: 0.2, seq: 1 })
+    expect(h.inputs[2]).toEqual({ x: 0.1, y: 0.2, seq: 1, epoch: 0 })
     expect(h.status[2]?.mode).toBe('relay')
 
     // the phone's channel opens → p2p; older (out-of-order) inputs are dropped
@@ -214,7 +223,7 @@ describe('HostSession (TV)', () => {
     expect(h.status[2].mode).toBe('p2p')
     ch.onmessage!({ data: '["i",0.3,0.4,5]' })
     ch.onmessage!({ data: '["i",0.9,0.9,3]' })
-    expect(h.inputs[2]).toEqual({ x: 0.3, y: 0.4, seq: 5 })
+    expect(h.inputs[2]).toEqual({ x: 0.3, y: 0.4, seq: 5, epoch: 0 })
 
     // pings go over the open channel; the pong yields an RTT
     tick()

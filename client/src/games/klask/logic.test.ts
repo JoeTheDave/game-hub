@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { boardGeometry, clampToZone, zoneOf } from '@games/klask/physics'
-import { bannerText, clampSensitivity, deltaToTable, flickGain, isFreshMatch, makeThrottle, seriesSummary, shouldReset, standingsRows, trackpadStep } from './logic'
+import { bannerText, clampSensitivity, recenter, deltaToTable, flickGain, isFreshMatch, makeThrottle, seriesSummary, shouldReset, standingsRows, trackpadStep } from './logic'
 
 const close = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(1e-9)
 
@@ -41,7 +41,7 @@ describe('trackpad mapping', () => {
   it('flicks travel further, slow moves don’t, and the gain is capped', () => {
     expect(flickGain(5, 50)).toBe(1)
     expect(flickGain(40, 20)).toBeGreaterThan(1)
-    expect(flickGain(10000, 1)).toBe(2.2)
+    expect(flickGain(10000, 1)).toBe(1.5)
     expect(flickGain(5, 0)).toBe(1)
   })
 
@@ -63,9 +63,9 @@ describe('trackpad mapping', () => {
   })
 
   it('sensitivity is clamped to its range with a sane default', () => {
-    expect(clampSensitivity(9)).toBe(2.5)
-    expect(clampSensitivity(0.1)).toBe(0.5)
-    expect(clampSensitivity('x')).toBe(1.1)
+    expect(clampSensitivity(9)).toBe(1.5)
+    expect(clampSensitivity(0.1)).toBe(0.3)
+    expect(clampSensitivity('x')).toBe(0.6)
   })
 })
 
@@ -129,3 +129,16 @@ describe('end screen', () => {
     expect(s.line).toContain('Bo leads the series')
   })
 })
+
+describe('recenter (input epochs)', () => {
+  const home = { x: -110, y: 0 }
+  it('a new epoch sends the target home and adopts the epoch', () => {
+    expect(recenter({ epoch: 3, target: { x: -150, y: 20 } }, 4, home)).toEqual({ epoch: 4, target: home })
+    // also when the table restarted and its epoch is lower (a reloaded TV)
+    expect(recenter({ epoch: 9, target: { x: -150, y: 20 } }, 1, home)).toEqual({ epoch: 1, target: home })
+  })
+  it('a repeat of the current epoch keeps the target (the table just missed our input)', () => {
+    expect(recenter({ epoch: 4, target: { x: -150, y: 20 } }, 4, home)).toEqual({ epoch: 4, target: { x: -150, y: 20 } })
+  })
+})
+

@@ -4,11 +4,12 @@ import { AdminMenu } from '../../components/AdminMenu'
 import { boardGeometry, type Vec } from '@games/klask/physics'
 import type { KlaskAction, KlaskPlayerView } from '@games/klask/engine'
 import { useRealtimeController } from '../../realtime'
-import { SENSITIVITY, clampSensitivity, seatHex, seriesSummary, standingsRows, trackpadStep, type Mapping } from './logic'
+import { SENSITIVITY, clampSensitivity, recenter, seatHex, seriesSummary, standingsRows, trackpadStep, type Mapping } from './logic'
 import { LivesPips, SeriesTable, Standings } from './components'
 import './klask.css'
 
-const SENS_KEY = 'klask:sensitivity'
+// v2: the default dropped from 1.1 to 0.6; old saved values are ignored rather than migrated.
+const SENS_KEY = 'klask:sensitivity:v2'
 const MAP_KEY = 'klask:mapping'
 const HEARTBEAT_MS = 100
 
@@ -41,13 +42,20 @@ export function PhoneView({ instance, view, playerOrder, rematch, admin, error }
   const [mapping, setMapping] = useState<Mapping>(() => readSetting(MAP_KEY, (v) => (v === 'side' ? 'side' : 'tv')))
   const [settings, setSettings] = useState(false)
   const target = useRef<Vec>({ ...geo.homeSpots[playerOrder] })
+  /** The table's input epoch this phone's targets are for (see TableDirector.epoch). */
+  const epoch = useRef(0)
   const live = !view.finished && view.alive
+  const sendRef = useRef<(x: number, y: number, epoch?: number) => void>(() => {})
 
   const onFeedback = useCallback(
     (data: unknown) => {
-      const d = data as { re?: string; kind?: string } | null
+      const d = data as { re?: string; kind?: string; epoch?: number } | null
       if (d?.re === 'center') {
-        target.current = { ...boardGeometry(view.playerCount).homeSpots[playerOrder] }
+        const next = recenter({ epoch: epoch.current, target: target.current }, d.epoch, boardGeometry(view.playerCount).homeSpots[playerOrder])
+        epoch.current = next.epoch
+        target.current = next.target
+        // Answer at once, so the table has a current-epoch target without waiting for a touch.
+        sendRef.current(next.target.x, next.target.y, next.epoch)
       } else if (d?.kind === 'hit') buzz(8)
       else if (d?.kind === 'snap') buzz(20)
       else if (d?.kind === 'point') buzz(60)
@@ -55,6 +63,7 @@ export function PhoneView({ instance, view, playerOrder, rematch, admin, error }
     [view.playerCount, playerOrder]
   )
   const rt = useRealtimeController(instance.id, live ? playerOrder : null, onFeedback)
+  sendRef.current = rt.send
 
   // A new play (or a new match) re-centres too, in case the TV's feedback was missed.
   useEffect(() => {
@@ -67,7 +76,7 @@ export function PhoneView({ instance, view, playerOrder, rematch, admin, error }
   useEffect(() => {
     if (!live) return
     const h = window.setInterval(() => {
-      if (touching.current) send(target.current.x, target.current.y)
+      if (touching.current) send(target.current.x, target.current.y, epoch.current)
     }, HEARTBEAT_MS)
     return () => window.clearInterval(h)
   }, [live, send])
@@ -83,7 +92,7 @@ export function PhoneView({ instance, view, playerOrder, rematch, admin, error }
     const next = trackpadStep(target.current, { dx: e.clientX - t.x, dy: e.clientY - t.y, dtMs: e.timeStamp - t.t }, { seat: playerOrder, geo, mapping, sensitivity })
     touching.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp }
     target.current = next
-    rt.send(next.x, next.y)
+    rt.send(next.x, next.y, epoch.current)
   }
   const onUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (touching.current?.id === e.pointerId) touching.current = null
@@ -159,12 +168,12 @@ export function PhoneView({ instance, view, playerOrder, rematch, admin, error }
         <div className="absolute inset-0 z-20 flex items-end justify-center bg-black/50" onClick={() => setSettings(false)}>
           <div className="w-full max-w-md rounded-t-2xl p-5 pb-8" style={{ background: '#141a30' }} onClick={(e) => e.stopPropagation()}>
             <div className="font-extrabold text-lg mb-3">Controls</div>
-            <label className="block text-sm mb-1">Sensitivity · {sensitivity.toFixed(1)}×</label>
+            <label className="block text-sm mb-1">Sensitivity · {sensitivity.toFixed(2)}×</label>
             <input
               type="range"
               min={SENSITIVITY.min}
               max={SENSITIVITY.max}
-              step={0.1}
+              step={SENSITIVITY.step}
               value={sensitivity}
               onChange={(e) => saveSens(Number(e.target.value))}
               className="w-full cursor-pointer"

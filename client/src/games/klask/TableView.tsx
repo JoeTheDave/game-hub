@@ -4,7 +4,7 @@ import { boardGeometry } from '@games/klask/physics'
 import type { KlaskTableView } from '@games/klask/engine'
 import { useRealtimeHost, postAuthorityAction } from '../../realtime'
 import { createRenderer, fitView, toPx } from './render'
-import { TableDirector } from './director'
+import { TableDirector, type Target } from './director'
 import { bannerText, seatHex, seriesSummary, standingsRows } from './logic'
 import { FRAME_MM } from './render/common'
 import { LivesPips, SeriesTable, Standings } from './components'
@@ -103,8 +103,8 @@ export function TableView({ instance, view, seq, onEventsDone, sound }: TableVie
       const dt = Math.min(0.1, Math.max(0, (now - last) / 1000))
       last = now
       const d = directorRef.current!
-      const targets: Record<number, { x: number; y: number }> = {}
-      for (const [seat, inp] of Object.entries(host.inputs.current)) targets[Number(seat)] = { x: inp.x, y: inp.y }
+      const targets: Record<number, Target> = {}
+      for (const [seat, inp] of Object.entries(host.inputs.current)) targets[Number(seat)] = { x: inp.x, y: inp.y, epoch: inp.epoch }
       d.tick(dt, targets, now)
       const dpr = Math.min(2, window.devicePixelRatio || 1)
       const w = canvas.clientWidth

@@ -51,7 +51,7 @@ export function useRealtimeHost(instanceId: string | null): RealtimeHost {
 
 export interface RealtimeController {
   /** Send the striker's target position in table coordinates (call on every pointer move). */
-  send: (x: number, y: number) => void
+  send: (x: number, y: number, epoch?: number) => void
   status: SeatStatus
 }
 
@@ -85,6 +85,6 @@ export function useRealtimeController(
       if (session.current === s) session.current = null
     }
   }, [instanceId, seat])
-  const send = useMemo(() => (x: number, y: number) => session.current?.send(x, y), [])
+  const send = useMemo(() => (x: number, y: number, epoch?: number) => session.current?.send(x, y, epoch), [])
   return { send, status }
 }

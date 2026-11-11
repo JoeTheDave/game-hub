@@ -9,6 +9,7 @@ import { sessionMiddleware } from './auth/session.js'
 import authRoutes from './routes/auth.js'
 import gameRoutes from './routes/games.js'
 import './auth/passport.js'
+import { readBuildId } from './lib/buildId.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -38,6 +39,13 @@ export function createApp() {
   // Serve static files from the React app build directory
   const clientBuildPath = path.join(__dirname, '../../dist/client')
   app.use(express.static(clientBuildPath))
+
+  // The running build, so pages left open across a deploy can tell and reload (no caching).
+  const buildId = readBuildId(clientBuildPath)
+  app.get('/api/version', (_req, res) => {
+    res.set('Cache-Control', 'no-store')
+    res.json({ buildId })
+  })
 
   // API routes
   app.use('/api/auth', authRoutes)

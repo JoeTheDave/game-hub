@@ -186,7 +186,7 @@ export class HostSession {
   private handle(n: number, m: RtMessage | null) {
     if (!m) return
     if (m.t === 'input') {
-      const next = { x: m.x, y: m.y, seq: m.seq }
+      const next = { x: m.x, y: m.y, seq: m.seq, epoch: m.epoch ?? 0 }
       if (isNewer(this.inputs[n], next)) this.inputs[n] = next
     } else if (m.t === 'pong') {
       this.seat(n).rtt.pong(m.n, this.deps.now())
@@ -265,9 +265,9 @@ export class ControllerSession {
     void this.connect()
   }
 
-  /** Send the striker's target position (table coordinates). */
-  send(x: number, y: number) {
-    const m: RtMessage = { t: 'input', x, y, seq: ++this.seq }
+  /** Send the striker's target position (table coordinates), tagged with the table's input epoch. */
+  send(x: number, y: number, epoch = 0) {
+    const m: RtMessage = { t: 'input', x, y, seq: ++this.seq, epoch }
     this.transmit(m)
   }
 

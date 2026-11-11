@@ -14,6 +14,15 @@ export interface DirectorDeps {
 
 /** At most this many physics steps per frame (a long hitch never spirals). */
 const MAX_STEPS_PER_FRAME = 12
+/** How often to re-send "center" to a phone whose input isn't for the current epoch yet (ms). */
+export const CENTER_RESEND_MS = 400
+
+/** A phone's latest target, tagged with the input epoch it was made for. */
+export interface Target {
+  x: number
+  y: number
+  epoch?: number
+}
 
 /**
  * The TV's game loop, without React or the DOM: runs the physics at a fixed 120 Hz from the
@@ -29,6 +38,15 @@ export class TableDirector {
   /** The point awaiting the platform: the round it was scored in and when. */
   pending: { round: number; at: number } | null = null
   private throttle = makeThrottle(70)
+  /**
+   * The input epoch. It is bumped on every reset and rematch, and a phone's target counts only
+   * when it was made for the current epoch. Stale targets (e.g. a finger last seen over the
+   * player's own goal) can never drag a freshly reset striker back into its goal (Joe, 2026-11-10:
+   * player 2 looped into its own goal after a rematch). Until a phone catches up, its striker
+   * holds at home and the TV keeps re-sending "center".
+   */
+  epoch = 1
+  private centerSentAt: Record<number, number> = {}
 
   private deps: DirectorDeps
 
@@ -53,16 +71,24 @@ export class TableDirector {
       this.geo = boardGeometry(view.playerCount)
       this.world = createWorld(view.playerCount, this.alive(view), view.serveSeat)
       this.pending = null
-      this.recentre()
+      this.recentre(now)
       return
     }
     this.maybeReset(now)
   }
 
-  private recentre() {
+  /** New epoch: every phone re-centres its target to its home spot and sends a fresh one. */
+  private recentre(now: number) {
+    this.epoch++
+    this.centerSentAt = {}
     this.world.alive.forEach((a, seat) => {
-      if (a) this.deps.send(seat, { re: 'center' })
+      if (a) this.sendCenter(seat, now)
     })
+  }
+
+  private sendCenter(seat: number, now: number) {
+    this.centerSentAt[seat] = now
+    this.deps.send(seat, { re: 'center', epoch: this.epoch })
   }
 
   private maybeReset(now: number) {
@@ -71,20 +97,26 @@ export class TableDirector {
       this.world = resetRound(this.world, this.view.serveSeat, this.alive(this.view))
       this.pending = null
       this.deps.play('serve', 0.6)
-      this.recentre()
+      this.recentre(now)
     }
   }
 
   /** Advance by `dt` seconds of wall time with the phones' latest targets (table mm). */
-  tick(dt: number, targets: Record<number, { x: number; y: number } | undefined>, now: number) {
+  tick(dt: number, targets: Record<number, Target | undefined>, now: number) {
     this.maybeReset(now)
     if (this.view.finished) return
     const inputs: Inputs = {}
     this.world.strikers.forEach((s, seat) => {
       if (!s) return
       const t = targets[seat]
-      // No input yet: the striker stays where it is (the magnet doesn't move by itself).
-      inputs[seat] = t ? clampToZone(this.geo, seat, t.x, t.y) : { x: s.x, y: s.y }
+      if (t && (t.epoch ?? 0) === this.epoch) {
+        inputs[seat] = clampToZone(this.geo, seat, t.x, t.y)
+        return
+      }
+      // No target for this epoch yet: hold at home, and nudge the phone again in case the
+      // "center" message was lost (feedback rides an unreliable channel).
+      inputs[seat] = { ...this.geo.homeSpots[seat] }
+      if (now - (this.centerSentAt[seat] ?? -Infinity) >= CENTER_RESEND_MS) this.sendCenter(seat, now)
     })
     this.acc = Math.min(this.acc + dt, STEP * MAX_STEPS_PER_FRAME)
     while (this.acc >= STEP) {

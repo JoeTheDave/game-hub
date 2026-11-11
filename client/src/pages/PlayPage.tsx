@@ -9,6 +9,7 @@ import { useWakeLock } from '../hooks/useWakeLock'
 import { PhoneLobby } from '../components/PhoneLobby'
 import type { GameInstance } from '../types/game'
 import { useAdmin } from '../hooks/useAdmin'
+import { useAutoReloadOnDeploy } from '../hooks/useAutoReloadOnDeploy'
 
 function Message({ children }: { children: React.ReactNode }) {
   return <div className={`${PHONE_SCREEN_CLASS} items-center justify-center px-6 text-center text-slate-400`}>{children}</div>
@@ -22,6 +23,7 @@ export function PlayPage() {
   const navigate = useNavigate()
   const seat = useMemo(() => (id ? loadSeat(id) : null), [id])
   const { instance, playerView, error, loading, acceptInstance, acceptView, resync } = useSeatFeed(id ?? null, seat)
+  useAutoReloadOnDeploy()
   const mod = useGameModule(gameSlug)
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)

@@ -87,6 +87,14 @@ describe('game catalog', () => {
     expect(res.status).toBe(401)
   })
 
+  it('serves the running build id, uncached, for pages to detect a deploy', async () => {
+    const res = await request(app).get('/api/version')
+    expect(res.status).toBe(200)
+    expect(typeof res.body.buildId).toBe('string')
+    expect(res.body.buildId.length).toBeGreaterThan(0)
+    expect(res.headers['cache-control']).toBe('no-store')
+  })
+
   it('no longer exposes the template /api/users endpoints', async () => {
     expect((await request(app).get('/api/users')).status).toBe(404)
     expect((await request(app).post('/api/users').send({ email: 'x@y.z' })).status).toBe(404)

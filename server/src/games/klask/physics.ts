@@ -25,15 +25,16 @@ const BALL_DRAG = 0.8 // fraction of speed lost per second (felt friction)
 // Hits were far too explosive (Joe, 2026-11-10): a soft striker-ball bounce, a cap on how much of
 // the striker's speed reaches the ball, smoothed striker velocity (finger input arrives in
 // jumps, so raw per-step velocity spikes), and a lower top speed.
-const BALL_MAX = 1900 // mm/s
+// Iteration 3 (still explosive, strikers too fast): much lower caps, measured with bot play.
+const BALL_MAX = 1100 // mm/s
 const WALL_E = 0.7 // ball restitution with walls
-const HIT_E = 0.5 // ball restitution with strikers
+const HIT_E = 0.6 // ball restitution with strikers
 /** At most this much striker speed counts in a hit (mm/s); a flick still moves the striker fast. */
-const HIT_STRIKER_CAP = 1300
+const HIT_STRIKER_CAP = 650
 /** Smoothing for the striker velocity used in hits (fraction of the new reading per step). */
 const HIT_VEL_SMOOTH = 0.35
-const STRIKER_MAX = 3200 // mm/s (a fast hand)
-const STRIKER_ACCEL = 90000 // mm/s² (the magnet keeps up with the hand)
+const STRIKER_MAX = 1400 // mm/s (a quick but controllable hand)
+const STRIKER_ACCEL = 40000 // mm/s² (scaled with the top speed; position still follows immediately)
 const BISCUIT_DRAG = 3.2
 const MAGNET_RANGE = 22 // beyond contact, where the pull starts (mm)
 const MAGNET_PULL = 22000 // mm/s² at contact, falling off with distance
@@ -465,8 +466,11 @@ export function step(world: World, inputs: Inputs): { world: World; events: Phys
     // 5. Detection, one point per play: biscuits, then Klask, then a goal.
     let found: { against: number; reason: PointReason } | null = null
     for (const s of strikers) if (!found && s && s.attached.length >= 2) found = { against: s.seat, reason: 'biscuits' }
+    // No Klask (own goal) during the post-reset grace window: a striker dragged back over its
+    // goal by a stale input must never lose a point before its player can react (Joe, 2026-11-10).
+    const klaskLive = world.tick >= world.graceUntil
     for (const s of strikers) {
-      if (found || !s) continue
+      if (found || !s || !klaskLive) continue
       const g = geo.goals[s.seat]
       if (Math.hypot(s.x - g.x, s.y - g.y) < g.r) found = { against: s.seat, reason: 'klask' }
     }
